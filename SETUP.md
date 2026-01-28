@@ -75,11 +75,11 @@ CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
 
-# Your Gmail and App Password
-EMAIL_HOST=smtp.gmail.com
+# Your Email Service Configuration
+EMAIL_HOST=smtp.your-email-provider.com
 EMAIL_PORT=587
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASSWORD=your-16-char-app-password
+EMAIL_USER=your-email@example.com
+EMAIL_PASSWORD=your-app-password-here
 EMAIL_FROM=ThaparMarket <noreply@thaparmarket.com>
 
 FRONTEND_URL=http://localhost:3000
@@ -129,9 +129,9 @@ You should get:
 curl -X POST http://localhost:5000/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "email": "test@thapar.edu",
-    "password": "Test@1234",
-    "name": "Test User",
+    "email": "yourname@thapar.edu",
+    "password": "YourSecurePassword123!",
+    "name": "Your Name",
     "department": "CSE",
     "year": 3
   }'
