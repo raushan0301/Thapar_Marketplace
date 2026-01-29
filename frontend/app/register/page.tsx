@@ -27,27 +27,46 @@ export default function RegisterPage() {
     const validate = () => {
         const newErrors: Record<string, string> = {};
 
+        // Name validation
         if (!formData.name.trim()) {
-            newErrors.name = 'Name is required';
+            newErrors.name = 'Full name is required';
+        } else if (formData.name.trim().length < 2) {
+            newErrors.name = 'Name must be at least 2 characters';
         }
 
+        // Email validation
         if (!formData.email) {
             newErrors.email = 'Email is required';
         } else if (!formData.email.endsWith('@thapar.edu')) {
-            newErrors.email = 'Please use your Thapar email (@thapar.edu)';
+            newErrors.email = 'Please use your Thapar University email (@thapar.edu)';
+        } else if (!/^[^\s@]+@thapar\.edu$/.test(formData.email)) {
+            newErrors.email = 'Please enter a valid email address';
         }
 
+        // Password validation
         if (!formData.password) {
             newErrors.password = 'Password is required';
         } else if (formData.password.length < 8) {
             newErrors.password = 'Password must be at least 8 characters';
+        } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+            newErrors.password = 'Password must contain uppercase, lowercase, and number';
         }
 
-        if (formData.password !== formData.confirmPassword) {
+        // Confirm password validation
+        if (!formData.confirmPassword) {
+            newErrors.confirmPassword = 'Please confirm your password';
+        } else if (formData.password !== formData.confirmPassword) {
             newErrors.confirmPassword = 'Passwords do not match';
         }
 
         setErrors(newErrors);
+
+        // Show specific error toast for better UX
+        if (Object.keys(newErrors).length > 0) {
+            const firstError = Object.values(newErrors)[0];
+            toast.error(firstError);
+        }
+
         return Object.keys(newErrors).length === 0;
     };
 
@@ -82,19 +101,19 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-md w-full space-y-8">
-                {/* Header */}
-                <div className="text-center">
-                    <h2 className="text-3xl font-bold text-gray-900">Create your account</h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Join ThaparMarket and start buying, selling, and renting!
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+            <div className="w-full max-w-md">
+                {/* Header - Minimal */}
+                <div className="text-center mb-6">
+                    <h1 className="text-2xl font-semibold text-gray-900">Create Account</h1>
+                    <p className="mt-1 text-sm text-gray-500">
+                        Join ThaparMarket
                     </p>
                 </div>
 
-                {/* Form */}
-                <form className="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-md" onSubmit={handleSubmit}>
-                    <div className="space-y-4">
+                {/* Form - Clean & Minimal */}
+                <form className="bg-white p-6 rounded-xl shadow-sm border border-gray-200" onSubmit={handleSubmit}>
+                    <div className="space-y-3.5">
                         <Input
                             label="Full Name"
                             type="text"
@@ -138,7 +157,45 @@ export default function RegisterPage() {
                             required
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        {/* Password Requirements - Compact */}
+                        {formData.password && (
+                            <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                                <p className="text-xs font-medium text-gray-600 mb-1.5">
+                                    Password Requirements:
+                                </p>
+                                <div className="space-y-0.5">
+                                    <div className={`text-xs flex items-center ${formData.password.length >= 8 ? 'text-green-600' : 'text-gray-400'
+                                        }`}>
+                                        <span className="mr-1.5 text-sm">{formData.password.length >= 8 ? '✓' : '○'}</span>
+                                        8+ characters
+                                    </div>
+                                    <div className={`text-xs flex items-center ${/[A-Z]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'
+                                        }`}>
+                                        <span className="mr-1.5 text-sm">{/[A-Z]/.test(formData.password) ? '✓' : '○'}</span>
+                                        Uppercase letter
+                                    </div>
+                                    <div className={`text-xs flex items-center ${/[a-z]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'
+                                        }`}>
+                                        <span className="mr-1.5 text-sm">{/[a-z]/.test(formData.password) ? '✓' : '○'}</span>
+                                        Lowercase letter
+                                    </div>
+                                    <div className={`text-xs flex items-center ${/\d/.test(formData.password) ? 'text-green-600' : 'text-gray-400'
+                                        }`}>
+                                        <span className="mr-1.5 text-sm">{/\d/.test(formData.password) ? '✓' : '○'}</span>
+                                        Number
+                                    </div>
+                                    {formData.confirmPassword && (
+                                        <div className={`text-xs flex items-center ${formData.password === formData.confirmPassword ? 'text-green-600' : 'text-red-500'
+                                            }`}>
+                                            <span className="mr-1.5 text-sm">{formData.password === formData.confirmPassword ? '✓' : '✗'}</span>
+                                            Passwords match
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
                             <Input
                                 label="Department"
                                 type="text"
@@ -160,11 +217,11 @@ export default function RegisterPage() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3">
                             <Input
                                 label="Phone"
                                 type="tel"
-                                placeholder="+91 98765 43210"
+                                placeholder="9876543210"
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                             />
@@ -172,20 +229,20 @@ export default function RegisterPage() {
                             <Input
                                 label="Hostel"
                                 type="text"
-                                placeholder="Hostel A"
+                                placeholder="A"
                                 value={formData.hostel}
                                 onChange={(e) => setFormData({ ...formData, hostel: e.target.value })}
                             />
                         </div>
                     </div>
 
-                    <Button type="submit" className="w-full" isLoading={isLoading}>
+                    <Button type="submit" className="w-full mt-5" isLoading={isLoading}>
                         Create Account
                     </Button>
 
-                    <div className="text-center text-sm">
-                        <span className="text-gray-600">Already have an account? </span>
-                        <Link href="/login" className="text-blue-600 hover:text-blue-500 font-medium">
+                    <div className="text-center text-sm mt-4">
+                        <span className="text-gray-500">Already have an account? </span>
+                        <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium">
                             Sign in
                         </Link>
                     </div>

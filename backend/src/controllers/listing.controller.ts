@@ -210,10 +210,38 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
         const totalListings = parseInt(countResult.rows[0].count);
         const totalPages = Math.ceil(totalListings / limitNum);
 
+        // Transform the flat SQL result into nested structure
+        const formattedListings = result.rows.map((row: any) => ({
+            id: row.id,
+            user_id: row.user_id,
+            category_id: row.category_id,
+            title: row.title,
+            description: row.description,
+            price: row.price ? parseFloat(row.price) : null,
+            rental_rate: row.rental_rate ? parseFloat(row.rental_rate) : null,
+            rental_period: row.rental_period,
+            condition: row.condition,
+            location: row.location,
+            images: row.images || [],
+            listing_type: row.listing_type,
+            status: row.status,
+            views: row.views || 0,
+            is_featured: row.is_featured,
+            expires_at: row.expires_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            category_name: row.category_name,
+            user: {
+                name: row.seller_name,
+                profile_picture: row.seller_picture,
+                trust_score: row.seller_trust_score
+            }
+        }));
+
         res.status(200).json({
             success: true,
             data: {
-                listings: result.rows,
+                listings: formattedListings,
                 pagination: {
                     currentPage: pageNum,
                     totalPages,

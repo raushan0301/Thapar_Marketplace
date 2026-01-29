@@ -1,0 +1,371 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { listingService } from '@/services/listingService';
+import { useAuthStore } from '@/store/authStore';
+import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
+import toast from 'react-hot-toast';
+import { handleApiError } from '@/lib/api';
+import {
+    MapPin,
+    Clock,
+    Eye,
+    Star,
+    MessageSquare,
+    Edit,
+    Trash2,
+    ChevronLeft,
+    ChevronRight,
+} from 'lucide-react';
+import Link from 'next/link';
+
+export default function ListingDetailPage() {
+    const params = useParams();
+    const router = useRouter();
+    const { user, isAuthenticated } = useAuthStore();
+    const [listing, setListing] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        if (params.id) {
+            fetchListing(params.id as string);
+        }
+    }, [params.id]);
+
+    const fetchListing = async (id: string) => {
+        setIsLoading(true);
+        try {
+            const result = await listingService.getListingById(id);
+            if (result.success) {
+                setListing(result.data.listing);
+            }
+        } catch (error: any) {
+            const errorMessage = handleApiError(error);
+            toast.error(errorMessage);
+            router.push('/');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            const result = await listingService.deleteListing(listing.id);
+            if (result.success) {
+                toast.success('Listing deleted successfully');
+                router.push('/my-listings');
+            }
+        } catch (error: any) {
+            const errorMessage = handleApiError(error);
+            toast.error(errorMessage);
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
+        }
+    };
+
+    const handleContactSeller = () => {
+        if (!isAuthenticated) {
+            toast.error('Please login to contact the seller');
+            router.push('/login');
+            return;
+        }
+        router.push(`/messages?user=${listing.user_id}&listing=${listing.id}`);
+    };
+
+    const formatTimeAgo = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+        return date.toLocaleDateString();
+    };
+
+    const nextImage = () => {
+        if (listing?.images) {
+            setCurrentImageIndex((prev) => (prev + 1) % listing.images.length);
+        }
+    };
+
+    const prevImage = () => {
+        if (listing?.images) {
+            setCurrentImageIndex(
+                (prev) => (prev - 1 + listing.images.length) % listing.images.length
+            );
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-gray-600">Loading listing...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!listing) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-xl text-gray-600">Listing not found</p>
+                    <Link href="/" className="text-blue-600 hover:text-blue-700 mt-4 inline-block">
+                        Go back to home
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    const isOwner = user?.id === listing.user_id;
+
+    return (
+        <div className="min-h-screen bg-gray-50 py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Back Button */}
+                <button
+                    onClick={() => router.back()}
+                    className="flex items-center text-gray-600 hover:text-gray-900 mb-6"
+                >
+                    <ChevronLeft size={20} className="mr-1" />
+                    Back
+                </button>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left Column - Images */}
+                    <div className="lg:col-span-2">
+                        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                            {/* Main Image */}
+                            <div className="relative h-96 bg-gray-200">
+                                {listing.images && listing.images.length > 0 ? (
+                                    <>
+                                        <img
+                                            src={listing.images[currentImageIndex]}
+                                            alt={listing.title}
+                                            className="w-full h-full object-contain"
+                                        />
+
+                                        {/* Image Navigation */}
+                                        {listing.images.length > 1 && (
+                                            <>
+                                                <button
+                                                    onClick={prevImage}
+                                                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg"
+                                                >
+                                                    <ChevronLeft size={24} />
+                                                </button>
+                                                <button
+                                                    onClick={nextImage}
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg"
+                                                >
+                                                    <ChevronRight size={24} />
+                                                </button>
+
+                                                {/* Image Counter */}
+                                                <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-1 rounded-full text-sm">
+                                                    {currentImageIndex + 1} / {listing.images.length}
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                        No Image Available
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Thumbnail Gallery */}
+                            {listing.images && listing.images.length > 1 && (
+                                <div className="p-4 flex gap-2 overflow-x-auto">
+                                    {listing.images.map((image: string, index: number) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => setCurrentImageIndex(index)}
+                                            className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 ${index === currentImageIndex
+                                                ? 'border-blue-600'
+                                                : 'border-gray-200'
+                                                }`}
+                                        >
+                                            <img
+                                                src={image}
+                                                alt={`Thumbnail ${index + 1}`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Description */}
+                        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
+                            <p className="text-gray-700 whitespace-pre-wrap">{listing.description}</p>
+                        </div>
+
+                        {/* Details */}
+                        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4">Details</h2>
+                            <div className="grid grid-cols-2 gap-4">
+                                {listing.condition && (
+                                    <div>
+                                        <p className="text-sm text-gray-600 mb-1">Condition</p>
+                                        <p className="font-medium text-gray-900 capitalize">{listing.condition}</p>
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Type</p>
+                                    <p className="font-medium text-gray-900 capitalize">{listing.listing_type}</p>
+                                </div>
+                                {listing.location && (
+                                    <div>
+                                        <p className="text-sm text-gray-600 mb-1">Location</p>
+                                        <p className="font-medium text-gray-900">{listing.location}</p>
+                                    </div>
+                                )}
+                                {listing.rental_duration && (
+                                    <div>
+                                        <p className="text-sm text-gray-600 mb-1">Rental Duration</p>
+                                        <p className="font-medium text-gray-900">{listing.rental_duration}</p>
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Posted</p>
+                                    <p className="font-medium text-gray-900">{formatTimeAgo(listing.created_at)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Views</p>
+                                    <p className="font-medium text-gray-900 flex items-center">
+                                        <Eye size={16} className="mr-1" />
+                                        {listing.views}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column - Seller Info & Actions */}
+                    <div className="lg:col-span-1">
+                        <div className="bg-white rounded-lg shadow-md p-6 sticky top-20">
+                            {/* Title & Price */}
+                            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                                {listing.title}
+                            </h1>
+
+                            {listing.price && (
+                                <p className="text-3xl font-bold text-blue-600 mb-6">
+                                    ₹{listing.price.toLocaleString()}
+                                    {listing.listing_type === 'rent' && (
+                                        <span className="text-lg text-gray-500">/month</span>
+                                    )}
+                                </p>
+                            )}
+
+                            {/* Seller Info */}
+                            <div className="border-t border-b border-gray-200 py-4 mb-6">
+                                <p className="text-sm text-gray-500 mb-2">Seller</p>
+                                <div className="flex items-center">
+                                    {listing.seller_profile_picture ? (
+                                        <img
+                                            src={listing.seller_profile_picture}
+                                            alt={listing.seller_name}
+                                            className="w-12 h-12 rounded-full object-cover mr-3"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                                            <span className="text-lg text-blue-600 font-semibold">
+                                                {listing.seller_name?.charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <p className="font-semibold text-gray-900">
+                                            {listing.seller_name}
+                                        </p>
+                                        {listing.seller_trust_score && (
+                                            <div className="flex items-center text-sm text-gray-600">
+                                                <Star size={14} className="text-yellow-500 mr-1" />
+                                                {parseFloat(listing.seller_trust_score).toFixed(1)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            {isOwner ? (
+                                <div className="space-y-3">
+                                    <Link href={`/listings/edit/${listing.id}`}>
+                                        <Button className="w-full flex items-center justify-center">
+                                            <Edit size={18} className="mr-2" />
+                                            Edit Listing
+                                        </Button>
+                                    </Link>
+                                    <Button
+                                        variant="danger"
+                                        onClick={() => setShowDeleteModal(true)}
+                                        className="w-full flex items-center justify-center"
+                                    >
+                                        <Trash2 size={18} className="mr-2" />
+                                        Delete Listing
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button
+                                    onClick={handleContactSeller}
+                                    className="w-full flex items-center justify-center"
+                                >
+                                    <MessageSquare size={18} className="mr-2" />
+                                    Contact Seller
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Delete Confirmation Modal */}
+            <Modal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                title="Delete Listing"
+            >
+                <div className="space-y-4">
+                    <p className="text-gray-700">
+                        Are you sure you want to delete this listing? This action cannot be undone.
+                    </p>
+                    <div className="flex gap-3">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setShowDeleteModal(false)}
+                            className="flex-1"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={handleDelete}
+                            isLoading={isDeleting}
+                            className="flex-1"
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+        </div>
+    );
+}

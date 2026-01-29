@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MapPin, Clock, Eye } from 'lucide-react';
+import { Clock, User } from 'lucide-react';
 
 interface ListingCardProps {
     listing: {
@@ -8,6 +8,7 @@ interface ListingCardProps {
         title: string;
         description: string;
         price?: number;
+        rental_rate?: number;
         images: string[];
         condition?: string;
         listing_type: 'sell' | 'rent' | 'lost' | 'found';
@@ -22,36 +23,6 @@ interface ListingCardProps {
 }
 
 export const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
-    const getListingTypeColor = (type: string) => {
-        switch (type) {
-            case 'sell':
-                return 'bg-green-100 text-green-800';
-            case 'rent':
-                return 'bg-blue-100 text-blue-800';
-            case 'lost':
-                return 'bg-red-100 text-red-800';
-            case 'found':
-                return 'bg-yellow-100 text-yellow-800';
-            default:
-                return 'bg-gray-100 text-gray-800';
-        }
-    };
-
-    const getConditionColor = (condition?: string) => {
-        switch (condition) {
-            case 'new':
-                return 'bg-green-100 text-green-800';
-            case 'excellent':
-                return 'bg-blue-100 text-blue-800';
-            case 'good':
-                return 'bg-yellow-100 text-yellow-800';
-            case 'fair':
-                return 'bg-orange-100 text-orange-800';
-            default:
-                return 'bg-gray-100 text-gray-800';
-        }
-    };
-
     const formatTimeAgo = (dateString: string) => {
         const date = new Date(dateString);
         const now = new Date();
@@ -64,11 +35,13 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
         return date.toLocaleDateString();
     };
 
+    const displayPrice = listing.price || listing.rental_rate || 0;
+
     return (
         <Link href={`/listings/${listing.id}`}>
-            <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer h-full flex flex-col">
+            <div className="bg-white rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200">
                 {/* Image */}
-                <div className="relative h-48 bg-gray-200">
+                <div className="relative h-56 bg-gray-100">
                     {listing.images && listing.images.length > 0 ? (
                         <img
                             src={listing.images[0]}
@@ -80,91 +53,29 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
                             No Image
                         </div>
                     )}
-
-                    {/* Badges */}
-                    <div className="absolute top-2 left-2 flex gap-2">
-                        <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold ${getListingTypeColor(
-                                listing.listing_type
-                            )}`}
-                        >
-                            {listing.listing_type.toUpperCase()}
-                        </span>
-                        {listing.condition && (
-                            <span
-                                className={`px-2 py-1 rounded-full text-xs font-semibold ${getConditionColor(
-                                    listing.condition
-                                )}`}
-                            >
-                                {listing.condition}
-                            </span>
-                        )}
-                    </div>
                 </div>
 
                 {/* Content */}
-                <div className="p-4 flex-grow flex flex-col">
+                <div className="p-4">
                     {/* Title */}
-                    <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 mb-2">
+                    <h3 className="text-base font-medium text-gray-900 line-clamp-2 mb-2">
                         {listing.title}
                     </h3>
 
-                    {/* Description */}
-                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                        {listing.description}
+                    {/* Price */}
+                    <p className="text-lg font-semibold text-gray-900 mb-3">
+                        ₹{displayPrice.toLocaleString()}
                     </p>
 
-                    {/* Price */}
-                    {listing.price && (
-                        <p className="text-xl font-bold text-blue-600 mb-3">
-                            ₹{listing.price.toLocaleString()}
-                            {listing.listing_type === 'rent' && (
-                                <span className="text-sm text-gray-500">/month</span>
-                            )}
-                        </p>
-                    )}
-
-                    {/* Footer */}
-                    <div className="mt-auto pt-3 border-t border-gray-100">
-                        {/* Location & Time */}
-                        <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                            {listing.location && (
-                                <div className="flex items-center">
-                                    <MapPin size={12} className="mr-1" />
-                                    {listing.location}
-                                </div>
-                            )}
-                            <div className="flex items-center">
-                                <Clock size={12} className="mr-1" />
-                                {formatTimeAgo(listing.created_at)}
-                            </div>
+                    {/* Footer Info */}
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                        <div className="flex items-center gap-1">
+                            <Clock size={14} />
+                            <span>{formatTimeAgo(listing.created_at)}</span>
                         </div>
-
-                        {/* Seller & Views */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                {listing.user.profile_picture ? (
-                                    <img
-                                        src={listing.user.profile_picture}
-                                        alt={listing.user.name}
-                                        className="w-6 h-6 rounded-full object-cover mr-2"
-                                    />
-                                ) : (
-                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mr-2">
-                                        <span className="text-xs text-blue-600 font-semibold">
-                                            {listing.user.name.charAt(0).toUpperCase()}
-                                        </span>
-                                    </div>
-                                )}
-                                <span className="text-xs text-gray-700 font-medium">
-                                    {listing.user.name}
-                                </span>
-                            </div>
-
-                            <div className="flex items-center text-xs text-gray-500">
-                                <Eye size={12} className="mr-1" />
-                                {listing.views}
-                            </div>
+                        <div className="flex items-center gap-1">
+                            <User size={14} />
+                            <span>{listing.user?.name || 'Unknown'}</span>
                         </div>
                     </div>
                 </div>
