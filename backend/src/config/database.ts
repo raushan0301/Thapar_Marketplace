@@ -13,7 +13,7 @@ const pool = new Pool({
 
 // Test database connection
 pool.on('connect', () => {
-    console.log('✅ Connected to Neon PostgreSQL database');
+    console.log('✅ Connected to Supabase PostgreSQL database');
 });
 
 pool.on('error', (err) => {

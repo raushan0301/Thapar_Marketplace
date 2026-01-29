@@ -20,7 +20,7 @@ A modern, full-stack marketplace platform built exclusively for Thapar Universit
 ### Backend
 - **Node.js + Express** - REST API server
 - **TypeScript** - Type-safe backend
-- **PostgreSQL (Neon)** - Serverless database
+- **PostgreSQL (Supabase)** - Serverless database
 - **Socket.IO** - Real-time messaging
 - **JWT** - Authentication
 - **Bcrypt** - Password hashing
@@ -29,7 +29,7 @@ A modern, full-stack marketplace platform built exclusively for Thapar Universit
 ### Services
 - **Cloudinary** - Image storage and optimization
 - **Gmail SMTP** - Email delivery
-- **Neon** - PostgreSQL database hosting
+- **Supabase** - PostgreSQL database hosting
 
 ---
 
@@ -127,7 +127,7 @@ marketplace/
 
 ### Prerequisites
 - Node.js 18+ and npm
-- PostgreSQL database (Neon account)
+- PostgreSQL database (Supabase account)
 - Cloudinary account
 - Gmail account (for sending emails)
 
@@ -151,7 +151,7 @@ cp .env.example .env
 Edit `.env` with your credentials:
 
 ```env
-# Database (Get from Neon dashboard)
+# Database (Get from Supabase dashboard)
 DATABASE_URL=postgresql://username:password@host/database
 
 # JWT Secret (generate a random string)
@@ -198,7 +198,7 @@ npm run dev
 
 ### 4. Database Setup
 
-1. Create a Neon account at https://neon.tech
+1. Create a Supabase account at https://supabase.com
 2. Create a new project
 3. Copy the connection string
 4. Run the schema:
@@ -447,7 +447,7 @@ ISC
 ## 🙏 Acknowledgments
 
 - Thapar University for the opportunity
-- Neon for PostgreSQL hosting
+- Supabase for PostgreSQL hosting
 - Cloudinary for image storage
 - All open-source libraries used
 

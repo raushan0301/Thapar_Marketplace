@@ -10,7 +10,7 @@
 ### Prerequisites
 - ✅ Backend running on http://localhost:5001
 - ✅ Frontend running on http://localhost:3000
-- ✅ Database connected (Neon PostgreSQL)
+- ✅ Database connected (Supabase PostgreSQL)
 - ✅ Email configured (Gmail SMTP)
 
 ---

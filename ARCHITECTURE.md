@@ -72,7 +72,7 @@
 ┌──────────────┐  ┌─────────────┐  ┌─────────────────┐
 │   DATABASE   │  │  CLOUDINARY │  │   EMAIL (SMTP)  │
 │              │  │             │  │                 │
-│ Neon         │  │ Image CDN   │  │ Gmail           │
+│ Supabase         │  │ Image CDN   │  │ Gmail           │
 │ PostgreSQL   │  │             │  │                 │
 │              │  │ • Upload    │  │ • Verification  │
 │ • Users      │  │ • Optimize  │  │ • Welcome       │
@@ -166,7 +166,7 @@ Next.js 14 (App Router)
 ```
 Node.js + Express
 ├── TypeScript
-├── PostgreSQL (Neon)
+├── PostgreSQL (Supabase)
 ├── Socket.IO (Real-time)
 ├── JWT (Authentication)
 ├── Bcrypt (Password hashing)
@@ -180,7 +180,7 @@ Node.js + Express
 
 ### Database Schema
 ```
-PostgreSQL (Neon)
+PostgreSQL (Supabase)
 ├── users (Authentication & Profiles)
 ├── categories (Marketplace categories)
 ├── listings (Products/Items)
@@ -243,7 +243,7 @@ PostgreSQL (Neon)
 │                    ┌────────────┼────────────┐   │
 │                    │            │            │   │
 │              ┌─────▼────┐  ┌───▼────┐  ┌───▼────┐
-│              │   Neon   │  │Cloudinary│ │ Gmail │
+│              │   Supabase   │  │Cloudinary│ │ Gmail │
 │              │PostgreSQL│  │   CDN    │  │ SMTP │
 │              └──────────┘  └──────────┘  └───────┘
 │                                                   │

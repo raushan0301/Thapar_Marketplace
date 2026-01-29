@@ -14,7 +14,7 @@ ThaparMarket is a full-stack campus marketplace application for Thapar Universit
 
 **Backend:**
 - Node.js + Express + TypeScript
-- PostgreSQL (Neon Database)
+- PostgreSQL (Supabase Database)
 - Socket.IO (Real-time chat)
 - Cloudinary (Image storage)
 - JWT Authentication
@@ -224,7 +224,7 @@ marketplace/
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL (Neon Database)
+- PostgreSQL (Supabase Database)
 - Cloudinary account
 - Gmail account (for email verification)
 
@@ -361,7 +361,7 @@ See `README.md` for detailed setup instructions.
 - [ ] Test image uploads
 
 ### Database
-- [x] Neon PostgreSQL configured
+- [x] Supabase PostgreSQL configured
 - [x] Schema deployed
 - [x] Dummy data added
 - [ ] Backup strategy implemented
@@ -440,7 +440,7 @@ For issues or questions:
 ## 🙏 Acknowledgments
 
 - Thapar University for the opportunity
-- Neon for PostgreSQL hosting
+- Supabase for PostgreSQL hosting
 - Cloudinary for image storage
 - All open-source libraries used
 - The amazing developer community

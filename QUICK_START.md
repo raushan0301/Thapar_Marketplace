@@ -7,7 +7,7 @@ Get ThaparMarket up and running in 5 minutes!
 ## Prerequisites
 
 - **Node.js 18+** and npm
-- **PostgreSQL** (Neon account - free)
+- **PostgreSQL** (Supabase account - free)
 - **Cloudinary** account (free)
 - **Gmail** account (for emails)
 
@@ -33,7 +33,7 @@ npm install
 ### Configure Environment
 Create `.env` file:
 ```env
-# Database (Get from Neon.tech)
+# Database (Get from Supabase.tech)
 DATABASE_URL=postgresql://username:password@host/database
 
 # JWT Secret (any random string)
@@ -88,11 +88,11 @@ npm run dev
 
 ## Step 4: Database Setup (1 minute)
 
-### Option A: Use Neon Console
-1. Go to https://neon.tech
+### Option A: Use Supabase Console
+1. Go to https://supabase.com
 2. Create new project
 3. Copy connection string to `.env`
-4. Run schema in Neon SQL Editor:
+4. Run schema in Supabase SQL Editor:
    - Copy contents of `database/schema.sql`
    - Paste and execute in SQL Editor
 
@@ -148,9 +148,9 @@ This adds:
 
 ## 🔧 Quick Configuration Guides
 
-### Get Neon Database URL
+### Get Supabase Database URL
 
-1. Go to https://neon.tech
+1. Go to https://supabase.com
 2. Sign up (free)
 3. Create new project
 4. Go to Dashboard → Connection Details
@@ -209,7 +209,7 @@ npm run dev
 
 **Solution:**
 1. Check `DATABASE_URL` in `.env`
-2. Ensure Neon database is active
+2. Ensure Supabase database is active
 3. Verify connection string format:
    ```
    postgresql://username:password@host/database?sslmode=require
