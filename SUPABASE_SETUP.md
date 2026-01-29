@@ -42,10 +42,7 @@
 7. Replace `[YOUR-PASSWORD]` with the password you created in Step 2
 
 **Example:**
-```
-Before: postgresql://postgres.abc123:[YOUR-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
-After:  postgresql://postgres.abc123:ThaparMarket@2026!@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres
-```
+
 
 ### 4. Update backend/.env
 1. Open `backend/.env`
