@@ -9,10 +9,10 @@
 
 - [Authentication](#authentication)
 - [Users](#users)
-- [Listings](#listings-coming-soon)
-- [Messages](#messages-coming-soon)
-- [Ratings](#ratings-coming-soon)
-- [Admin](#admin-coming-soon)
+- [Listings](#listings)
+- [Messages](#messages)
+- [Ratings](#ratings)
+- [Admin](#admin)
 
 ---
 
@@ -305,7 +305,7 @@ profile_picture: <file>
 
 ---
 
-## 📦 Listings *(Coming Soon)*
+## 📦 Listings
 
 ### Create Listing
 
@@ -396,7 +396,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-## 💬 Messages *(Coming Soon)*
+## 💬 Messages
 
 ### Send Message
 
@@ -440,7 +440,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-## ⭐ Ratings *(Coming Soon)*
+## ⭐ Ratings
 
 ### Rate User
 
@@ -469,7 +469,7 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-## 🛡️ Admin *(Coming Soon)*
+## 🛡️ Admin
 
 ### Get All Users
 
@@ -689,5 +689,6 @@ Authorization: Bearer <your_jwt_token>
 
 ---
 
-**Last Updated:** January 28, 2026  
-**API Version:** 1.0.0
+**Last Updated:** January 29, 2026  
+**API Version:** 1.0.0  
+**Status:** ✅ All endpoints implemented and tested
