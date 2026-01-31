@@ -6,6 +6,13 @@ export const uploadImage = async (
     folder: string = 'thaparmarket'
 ): Promise<string> => {
     return new Promise((resolve, reject) => {
+        console.log(`📤 Starting image upload to folder: ${folder}, size: ${(fileBuffer.length / 1024).toFixed(2)}KB`);
+
+        // Set timeout for upload (30 seconds)
+        const timeout = setTimeout(() => {
+            reject(new Error('Image upload timeout - took longer than 30 seconds'));
+        }, 30000);
+
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 folder,
@@ -14,11 +21,16 @@ export const uploadImage = async (
                     { quality: 'auto', fetch_format: 'auto' },
                     { width: 1200, height: 1200, crop: 'limit' },
                 ],
+                timeout: 60000, // Cloudinary timeout: 60 seconds
             },
             (error, result) => {
+                clearTimeout(timeout);
+
                 if (error) {
+                    console.error('❌ Cloudinary upload error:', error);
                     reject(error);
                 } else {
+                    console.log(`✅ Image uploaded successfully: ${result!.secure_url}`);
                     resolve(result!.secure_url);
                 }
             }
@@ -33,8 +45,21 @@ export const uploadMultipleImages = async (
     files: Express.Multer.File[],
     folder: string = 'thaparmarket'
 ): Promise<string[]> => {
-    const uploadPromises = files.map((file) => uploadImage(file.buffer, folder));
-    return Promise.all(uploadPromises);
+    console.log(`📤 Uploading ${files.length} images...`);
+
+    try {
+        const uploadPromises = files.map((file, index) => {
+            console.log(`  - Image ${index + 1}/${files.length}: ${file.originalname}`);
+            return uploadImage(file.buffer, folder);
+        });
+
+        const results = await Promise.all(uploadPromises);
+        console.log(`✅ All ${files.length} images uploaded successfully`);
+        return results;
+    } catch (error) {
+        console.error('❌ Failed to upload images:', error);
+        throw error;
+    }
 };
 
 export const deleteImage = async (imageUrl: string): Promise<void> => {
