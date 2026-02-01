@@ -33,8 +33,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 )}
                 <div
                     className={`rounded-lg px-4 py-2 ${isOwnMessage
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-900'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-900'
                         }`}
                 >
                     <p className="whitespace-pre-wrap break-words">{message.message}</p>
@@ -43,8 +43,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                             {formatTime(message.created_at)}
                         </span>
                         {isOwnMessage && (
-                            <span className="text-xs text-blue-100">
-                                {message.is_read ? '✓✓' : '✓'}
+                            <span className={`text-xs ${message.is_read ? 'text-green-400' : 'text-blue-100'}`}>
+                                ✓✓
                             </span>
                         )}
                     </div>

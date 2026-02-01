@@ -1,7 +1,22 @@
 import { Response } from 'express';
-import pool from '../config/database';
+import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
 import { uploadMultipleImages, deleteMultipleImages } from '../services/cloudinary.service';
+
+// Helper function to parse images field
+function parseImages(images: any): string[] {
+    if (!images) return [];
+    if (Array.isArray(images)) return images;
+    if (typeof images === 'string') {
+        try {
+            return JSON.parse(images);
+        } catch (e) {
+            // If it's a plain string (URL), wrap it in an array
+            return [images];
+        }
+    }
+    return [];
+}
 
 // Create new listing
 export const createListing = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -15,7 +30,6 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
             condition,
             listing_type,
             location,
-            rental_duration,
         } = req.body;
 
         // Validate required fields
@@ -31,7 +45,9 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
         let imageUrls: string[] = [];
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
             try {
+                console.log(`📸 Uploading ${req.files.length} images...`);
                 imageUrls = await uploadMultipleImages(req.files, 'thaparmarket/listings');
+                console.log(`✅ Images uploaded successfully: ${imageUrls.length} images`);
             } catch (uploadError) {
                 console.error('Image upload error:', uploadError);
                 res.status(500).json({
@@ -42,28 +58,36 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
             }
         }
 
+        console.log('💾 Inserting listing into database...');
+
         // Insert listing
-        const result = await pool.query(
-            `INSERT INTO listings 
-            (user_id, title, description, price, category_id, condition, listing_type, location, rental_duration, images, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            RETURNING *`,
-            [
-                userId,
+        const { data: listing, error } = await supabase
+            .from('listings')
+            .insert({
+                user_id: userId,
                 title,
                 description,
-                price || null,
+                price: price || null,
                 category_id,
-                condition || null,
+                condition: condition || null,
                 listing_type,
-                location || null,
-                rental_duration || null,
-                imageUrls.length > 0 ? JSON.stringify(imageUrls) : null,
-                'active',
-            ]
-        );
+                location: location || null,
+                images: imageUrls.length > 0 ? imageUrls : null,
+                status: 'active',
+            })
+            .select()
+            .single();
 
-        const listing = result.rows[0];
+        if (error) {
+            console.error('Database error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create listing',
+            });
+            return;
+        }
+
+        console.log('✅ Listing created successfully!');
 
         res.status(201).json({
             success: true,
@@ -85,168 +109,108 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
         const {
             category_id,
             listing_type,
+            condition,
             min_price,
             max_price,
-            condition,
             search,
-            sort = 'created_at',
-            order = 'desc',
+            sort_by = 'created_at',
+            sort_order = 'desc',
             page = '1',
             limit = '20',
         } = req.query;
 
-        let query = `
-            SELECT l.*, u.name as seller_name, u.profile_picture as seller_picture, 
-                   u.trust_score as seller_trust_score, c.name as category_name
-            FROM listings l
-            JOIN users u ON l.user_id = u.id
-            JOIN categories c ON l.category_id = c.id
-            WHERE l.status = 'active'
-        `;
-
-        const params: any[] = [];
-        let paramCount = 0;
-
-        // Apply filters
-        if (category_id) {
-            paramCount++;
-            query += ` AND l.category_id = $${paramCount}`;
-            params.push(category_id);
-        }
-
-        if (listing_type) {
-            paramCount++;
-            query += ` AND l.listing_type = $${paramCount}`;
-            params.push(listing_type);
-        }
-
-        if (min_price) {
-            paramCount++;
-            query += ` AND l.price >= $${paramCount}`;
-            params.push(min_price);
-        }
-
-        if (max_price) {
-            paramCount++;
-            query += ` AND l.price <= $${paramCount}`;
-            params.push(max_price);
-        }
-
-        if (condition) {
-            paramCount++;
-            query += ` AND l.condition = $${paramCount}`;
-            params.push(condition);
-        }
-
-        if (search) {
-            paramCount++;
-            query += ` AND (l.title ILIKE $${paramCount} OR l.description ILIKE $${paramCount})`;
-            params.push(`%${search}%`);
-        }
-
-        // Sorting
-        const validSortFields = ['created_at', 'price', 'views'];
-        const sortField = validSortFields.includes(sort as string) ? sort : 'created_at';
-        const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
-        query += ` ORDER BY l.${sortField} ${sortOrder}`;
-
-        // Pagination
         const pageNum = parseInt(page as string);
         const limitNum = parseInt(limit as string);
         const offset = (pageNum - 1) * limitNum;
 
-        paramCount++;
-        query += ` LIMIT $${paramCount}`;
-        params.push(limitNum);
+        // Build query
+        let query = supabase
+            .from('listings')
+            .select(`
+                *,
+                users:user_id (
+                    id,
+                    name,
+                    profile_picture,
+                    trust_score
+                ),
+                categories:category_id (
+                    id,
+                    name,
+                    icon
+                )
+            `, { count: 'exact' })
+            .eq('status', 'active');
 
-        paramCount++;
-        query += ` OFFSET $${paramCount}`;
-        params.push(offset);
-
-        const result = await pool.query(query, params);
-
-        // Get total count
-        let countQuery = `SELECT COUNT(*) FROM listings l WHERE l.status = 'active'`;
-        const countParams: any[] = [];
-        let countParamCount = 0;
-
+        // Apply filters
         if (category_id) {
-            countParamCount++;
-            countQuery += ` AND l.category_id = $${countParamCount}`;
-            countParams.push(category_id);
+            query = query.eq('category_id', category_id);
         }
 
         if (listing_type) {
-            countParamCount++;
-            countQuery += ` AND l.listing_type = $${countParamCount}`;
-            countParams.push(listing_type);
-        }
-
-        if (min_price) {
-            countParamCount++;
-            countQuery += ` AND l.price >= $${countParamCount}`;
-            countParams.push(min_price);
-        }
-
-        if (max_price) {
-            countParamCount++;
-            countQuery += ` AND l.price <= $${countParamCount}`;
-            countParams.push(max_price);
+            query = query.eq('listing_type', listing_type);
         }
 
         if (condition) {
-            countParamCount++;
-            countQuery += ` AND l.condition = $${countParamCount}`;
-            countParams.push(condition);
+            query = query.eq('condition', condition);
+        }
+
+        if (min_price) {
+            query = query.gte('price', parseFloat(min_price as string));
+        }
+
+        if (max_price) {
+            query = query.lte('price', parseFloat(max_price as string));
         }
 
         if (search) {
-            countParamCount++;
-            countQuery += ` AND (l.title ILIKE $${countParamCount} OR l.description ILIKE $${countParamCount})`;
-            countParams.push(`%${search}%`);
+            query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
         }
 
-        const countResult = await pool.query(countQuery, countParams);
-        const totalListings = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalListings / limitNum);
+        // Apply sorting
+        const ascending = sort_order === 'asc';
 
-        // Transform the flat SQL result into nested structure
-        const formattedListings = result.rows.map((row: any) => ({
-            id: row.id,
-            user_id: row.user_id,
-            category_id: row.category_id,
-            title: row.title,
-            description: row.description,
-            price: row.price ? parseFloat(row.price) : null,
-            rental_rate: row.rental_rate ? parseFloat(row.rental_rate) : null,
-            rental_period: row.rental_period,
-            condition: row.condition,
-            location: row.location,
-            images: row.images || [],
-            listing_type: row.listing_type,
-            status: row.status,
-            views: row.views || 0,
-            is_featured: row.is_featured,
-            expires_at: row.expires_at,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            category_name: row.category_name,
-            user: {
-                name: row.seller_name,
-                profile_picture: row.seller_picture,
-                trust_score: row.seller_trust_score
-            }
-        }));
+        // If sorting by price, filter out items without price (lost/found items)
+        if (sort_by === 'price') {
+            query = query.not('price', 'is', null);
+        }
+
+        query = query.order(sort_by as string, { ascending });
+
+        // Apply pagination
+        query = query.range(offset, offset + limitNum - 1);
+
+        const { data: listings, error, count } = await query;
+
+        if (error) {
+            console.error('Get listings error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch listings',
+            });
+            return;
+        }
+
+        // Parse images and flatten seller info for each listing
+        const parsedListings = listings?.map(listing => ({
+            ...listing,
+            images: parseImages(listing.images),
+            seller_name: listing.users?.name,
+            seller_profile_picture: listing.users?.profile_picture,
+            seller_trust_score: listing.users?.trust_score,
+            category_name: listing.categories?.name,
+            category_icon: listing.categories?.icon,
+        })) || [];
 
         res.status(200).json({
             success: true,
             data: {
-                listings: formattedListings,
+                listings: parsedListings,
                 pagination: {
-                    currentPage: pageNum,
-                    totalPages,
-                    totalListings,
+                    page: pageNum,
                     limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum),
                 },
             },
         });
@@ -264,18 +228,32 @@ export const getListingById = async (req: AuthRequest, res: Response): Promise<v
     try {
         const { listingId } = req.params;
 
-        const result = await pool.query(
-            `SELECT l.*, u.name as seller_name, u.email as seller_email, 
-                    u.phone as seller_phone, u.profile_picture as seller_picture,
-                    u.trust_score as seller_trust_score, c.name as category_name
-             FROM listings l
-             JOIN users u ON l.user_id = u.id
-             JOIN categories c ON l.category_id = c.id
-             WHERE l.id = $1`,
-            [listingId]
-        );
+        const { data: listing, error } = await supabase
+            .from('listings')
+            .select(`
+                *,
+                users:user_id (
+                    id,
+                    name,
+                    email,
+                    phone,
+                    profile_picture,
+                    trust_score,
+                    created_at
+                ),
+                categories:category_id (
+                    id,
+                    name,
+                    icon
+                )
+            `)
+            .eq('id', listingId)
+            .single();
 
-        if (result.rows.length === 0) {
+
+        if (error || !listing) {
+            console.error('Supabase error:', error);
+            console.error('Listing data:', listing);
             res.status(404).json({
                 success: false,
                 error: 'Listing not found',
@@ -283,14 +261,22 @@ export const getListingById = async (req: AuthRequest, res: Response): Promise<v
             return;
         }
 
-        // Increment view count
-        await pool.query('UPDATE listings SET views = views + 1 WHERE id = $1', [listingId]);
-
-        const listing = result.rows[0];
+        // Parse images and flatten seller info
+        const parsedListing = {
+            ...listing,
+            images: parseImages(listing.images),
+            seller_name: listing.users?.name,
+            seller_email: listing.users?.email,
+            seller_phone: listing.users?.phone,
+            seller_profile_picture: listing.users?.profile_picture,
+            seller_trust_score: listing.users?.trust_score,
+            category_name: listing.categories?.name,
+            category_icon: listing.categories?.icon,
+        };
 
         res.status(200).json({
             success: true,
-            data: { listing },
+            data: { listing: parsedListing },
         });
     } catch (error) {
         console.error('Get listing error:', error);
@@ -305,63 +291,64 @@ export const getListingById = async (req: AuthRequest, res: Response): Promise<v
 export const getMyListings = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const { status, page = '1', limit = '20' } = req.query;
+        const {
+            status,
+            page = '1',
+            limit = '20',
+        } = req.query;
 
-        let query = `
-            SELECT l.*, c.name as category_name
-            FROM listings l
-            JOIN categories c ON l.category_id = c.id
-            WHERE l.user_id = $1
-        `;
-
-        const params: any[] = [userId];
-        let paramCount = 1;
-
-        if (status) {
-            paramCount++;
-            query += ` AND l.status = $${paramCount}`;
-            params.push(status);
-        }
-
-        query += ` ORDER BY l.created_at DESC`;
-
-        // Pagination
         const pageNum = parseInt(page as string);
         const limitNum = parseInt(limit as string);
         const offset = (pageNum - 1) * limitNum;
 
-        paramCount++;
-        query += ` LIMIT $${paramCount}`;
-        params.push(limitNum);
-
-        paramCount++;
-        query += ` OFFSET $${paramCount}`;
-        params.push(offset);
-
-        const result = await pool.query(query, params);
-
-        // Get total count
-        let countQuery = `SELECT COUNT(*) FROM listings WHERE user_id = $1`;
-        const countParams: any[] = [userId];
+        let query = supabase
+            .from('listings')
+            .select(`
+                *,
+                categories!category_id (
+                    id,
+                    name,
+                    icon
+                )
+            `, { count: 'exact' })
+            .eq('user_id', userId);
 
         if (status) {
-            countQuery += ` AND status = $2`;
-            countParams.push(status);
+            query = query.eq('status', status);
         }
 
-        const countResult = await pool.query(countQuery, countParams);
-        const totalListings = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalListings / limitNum);
+        query = query
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limitNum - 1);
+
+        const { data: listings, error, count } = await query;
+
+        if (error) {
+            console.error('Get my listings error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch listings',
+            });
+            return;
+        }
+
+        // Parse images and flatten category info for each listing
+        const parsedListings = listings?.map(listing => ({
+            ...listing,
+            images: parseImages(listing.images),
+            category_name: listing.categories?.name,
+            category_icon: listing.categories?.icon,
+        })) || [];
 
         res.status(200).json({
             success: true,
             data: {
-                listings: result.rows,
+                listings: parsedListings,
                 pagination: {
-                    currentPage: pageNum,
-                    totalPages,
-                    totalListings,
+                    page: pageNum,
                     limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum),
                 },
             },
         });
@@ -369,7 +356,7 @@ export const getMyListings = async (req: AuthRequest, res: Response): Promise<vo
         console.error('Get my listings error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to fetch your listings',
+            error: 'Failed to fetch listings',
         });
     }
 };
@@ -379,16 +366,26 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
     try {
         const userId = req.user?.userId;
         const { listingId } = req.params;
-        const { title, description, price, condition, location, rental_duration, status } =
-            req.body;
+        const {
+            title,
+            description,
+            price,
+            category_id,
+            condition,
+            listing_type,
+            location,
+            existing_images,
+        } = req.body;
 
         // Check if listing exists and belongs to user
-        const existingListing = await pool.query(
-            'SELECT * FROM listings WHERE id = $1 AND user_id = $2',
-            [listingId, userId]
-        );
+        const { data: existingListing, error: fetchError } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('id', listingId)
+            .eq('user_id', userId)
+            .single();
 
-        if (existingListing.rows.length === 0) {
+        if (fetchError || !existingListing) {
             res.status(404).json({
                 success: false,
                 error: 'Listing not found or you do not have permission to edit it',
@@ -396,72 +393,19 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        // Build update query dynamically
-        const updates: string[] = [];
-        const params: any[] = [];
-        let paramCount = 0;
+        // Handle images
+        let imageUrls: string[] = [];
 
-        if (title) {
-            paramCount++;
-            updates.push(`title = $${paramCount}`);
-            params.push(title);
+        // Keep existing images that weren't removed
+        if (existing_images) {
+            imageUrls = Array.isArray(existing_images) ? existing_images : JSON.parse(existing_images);
         }
 
-        if (description) {
-            paramCount++;
-            updates.push(`description = $${paramCount}`);
-            params.push(description);
-        }
-
-        if (price !== undefined) {
-            paramCount++;
-            updates.push(`price = $${paramCount}`);
-            params.push(price);
-        }
-
-        if (condition) {
-            paramCount++;
-            updates.push(`condition = $${paramCount}`);
-            params.push(condition);
-        }
-
-        if (location) {
-            paramCount++;
-            updates.push(`location = $${paramCount}`);
-            params.push(location);
-        }
-
-        if (rental_duration) {
-            paramCount++;
-            updates.push(`rental_duration = $${paramCount}`);
-            params.push(rental_duration);
-        }
-
-        if (status) {
-            paramCount++;
-            updates.push(`status = $${paramCount}`);
-            params.push(status);
-        }
-
-        // Handle new images if provided
+        // Upload new images if provided
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
             try {
-                const newImageUrls = await uploadMultipleImages(
-                    req.files,
-                    'thaparmarket/listings'
-                );
-
-                // Get existing images
-                const existingImages = existingListing.rows[0].images
-                    ? JSON.parse(existingListing.rows[0].images)
-                    : [];
-
-                // Combine existing and new images
-                const allImages = [...existingImages, ...newImageUrls];
-
-                paramCount++;
-                updates.push(`images = $${paramCount}`);
-                params.push(JSON.stringify(allImages));
+                const newImageUrls = await uploadMultipleImages(req.files, 'thaparmarket/listings');
+                imageUrls = [...imageUrls, ...newImageUrls];
             } catch (uploadError) {
                 console.error('Image upload error:', uploadError);
                 res.status(500).json({
@@ -472,36 +416,48 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             }
         }
 
-        if (updates.length === 0) {
-            res.status(400).json({
+        // Delete removed images from Cloudinary
+        const oldImages = existingListing.images ? JSON.parse(existingListing.images) : [];
+        const removedImages = oldImages.filter((img: string) => !imageUrls.includes(img));
+        if (removedImages.length > 0) {
+            try {
+                await deleteMultipleImages(removedImages);
+            } catch (deleteError) {
+                console.error('Image deletion error:', deleteError);
+            }
+        }
+
+        // Update listing
+        const { data: updatedListing, error: updateError } = await supabase
+            .from('listings')
+            .update({
+                title: title || existingListing.title,
+                description: description || existingListing.description,
+                price: price !== undefined ? price : existingListing.price,
+                category_id: category_id || existingListing.category_id,
+                condition: condition || existingListing.condition,
+                listing_type: listing_type || existingListing.listing_type,
+                location: location || existingListing.location,
+                images: imageUrls.length > 0 ? imageUrls : null,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', listingId)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('Update error:', updateError);
+            res.status(500).json({
                 success: false,
-                error: 'No fields to update',
+                error: 'Failed to update listing',
             });
             return;
         }
 
-        paramCount++;
-        updates.push(`updated_at = NOW()`);
-
-        paramCount++;
-        params.push(listingId);
-
-        paramCount++;
-        params.push(userId);
-
-        const query = `
-            UPDATE listings 
-            SET ${updates.join(', ')}
-            WHERE id = $${paramCount - 1} AND user_id = $${paramCount}
-            RETURNING *
-        `;
-
-        const result = await pool.query(query, params);
-
         res.status(200).json({
             success: true,
             message: 'Listing updated successfully',
-            data: { listing: result.rows[0] },
+            data: { listing: updatedListing },
         });
     } catch (error) {
         console.error('Update listing error:', error);
@@ -519,12 +475,14 @@ export const deleteListing = async (req: AuthRequest, res: Response): Promise<vo
         const { listingId } = req.params;
 
         // Check if listing exists and belongs to user
-        const existingListing = await pool.query(
-            'SELECT * FROM listings WHERE id = $1 AND user_id = $2',
-            [listingId, userId]
-        );
+        const { data: listing, error: fetchError } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('id', listingId)
+            .eq('user_id', userId)
+            .single();
 
-        if (existingListing.rows.length === 0) {
+        if (fetchError || !listing) {
             res.status(404).json({
                 success: false,
                 error: 'Listing not found or you do not have permission to delete it',
@@ -533,21 +491,29 @@ export const deleteListing = async (req: AuthRequest, res: Response): Promise<vo
         }
 
         // Delete images from Cloudinary
-        const images = existingListing.rows[0].images
-            ? JSON.parse(existingListing.rows[0].images)
-            : [];
-
-        if (images.length > 0) {
+        if (listing.images) {
             try {
-                await deleteMultipleImages(images);
+                const imageUrls = parseImages(listing.images);
+                await deleteMultipleImages(imageUrls);
             } catch (deleteError) {
-                console.error('Error deleting images:', deleteError);
-                // Continue with listing deletion even if image deletion fails
+                console.error('Image deletion error:', deleteError);
             }
         }
 
         // Delete listing
-        await pool.query('DELETE FROM listings WHERE id = $1', [listingId]);
+        const { error: deleteError } = await supabase
+            .from('listings')
+            .delete()
+            .eq('id', listingId);
+
+        if (deleteError) {
+            console.error('Delete error:', deleteError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete listing',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
@@ -569,9 +535,7 @@ export const markListingStatus = async (req: AuthRequest, res: Response): Promis
         const { listingId } = req.params;
         const { status } = req.body;
 
-        // Validate status
-        const validStatuses = ['active', 'sold', 'rented', 'expired'];
-        if (!validStatuses.includes(status)) {
+        if (!['active', 'sold', 'rented', 'inactive'].includes(status)) {
             res.status(400).json({
                 success: false,
                 error: 'Invalid status',
@@ -579,13 +543,15 @@ export const markListingStatus = async (req: AuthRequest, res: Response): Promis
             return;
         }
 
-        // Check if listing exists and belongs to user
-        const existingListing = await pool.query(
-            'SELECT * FROM listings WHERE id = $1 AND user_id = $2',
-            [listingId, userId]
-        );
+        // Check if listing belongs to user
+        const { data: listing, error: fetchError } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('id', listingId)
+            .eq('user_id', userId)
+            .single();
 
-        if (existingListing.rows.length === 0) {
+        if (fetchError || !listing) {
             res.status(404).json({
                 success: false,
                 error: 'Listing not found or you do not have permission to update it',
@@ -594,15 +560,26 @@ export const markListingStatus = async (req: AuthRequest, res: Response): Promis
         }
 
         // Update status
-        const result = await pool.query(
-            'UPDATE listings SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [status, listingId]
-        );
+        const { data: updatedListing, error: updateError } = await supabase
+            .from('listings')
+            .update({ status })
+            .eq('id', listingId)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('Update error:', updateError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update listing status',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
-            message: `Listing marked as ${status}`,
-            data: { listing: result.rows[0] },
+            message: 'Listing status updated successfully',
+            data: { listing: updatedListing },
         });
     } catch (error) {
         console.error('Mark listing status error:', error);
@@ -616,11 +593,23 @@ export const markListingStatus = async (req: AuthRequest, res: Response): Promis
 // Get categories
 export const getCategories = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const result = await pool.query('SELECT * FROM categories ORDER BY name ASC');
+        const { data: categories, error } = await supabase
+            .from('categories')
+            .select('*')
+            .order('name', { ascending: true });
+
+        if (error) {
+            console.error('Get categories error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch categories',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
-            data: { categories: result.rows },
+            data: { categories: categories || [] },
         });
     } catch (error) {
         console.error('Get categories error:', error);

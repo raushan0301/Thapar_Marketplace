@@ -20,6 +20,7 @@ export default function HomePage() {
     max_price: '',
     condition: '',
   });
+  const [sortBy, setSortBy] = useState('newest');
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -42,20 +43,33 @@ export default function HomePage() {
     }
   };
 
-  const fetchListings = async (page = 1) => {
+  const fetchListings = async (page = 1, filterOverrides = {}) => {
     setIsLoading(true);
     try {
+      const currentFilters = { ...filters, ...filterOverrides };
       const params: any = {
         page,
         limit: 12,
       };
 
-      if (filters.search) params.search = filters.search;
-      if (filters.category_id) params.category_id = filters.category_id;
-      if (filters.listing_type) params.listing_type = filters.listing_type;
-      if (filters.min_price) params.min_price = filters.min_price;
-      if (filters.max_price) params.max_price = filters.max_price;
-      if (filters.condition) params.condition = filters.condition;
+      if (currentFilters.search) params.search = currentFilters.search;
+      if (currentFilters.category_id) params.category_id = currentFilters.category_id;
+      if (currentFilters.listing_type) params.listing_type = currentFilters.listing_type;
+      if (currentFilters.min_price) params.min_price = currentFilters.min_price;
+      if (currentFilters.max_price) params.max_price = currentFilters.max_price;
+      if (currentFilters.condition) params.condition = currentFilters.condition;
+
+      // Add sorting
+      if (sortBy === 'price-low') {
+        params.sort_by = 'price';
+        params.sort_order = 'asc';
+      } else if (sortBy === 'price-high') {
+        params.sort_by = 'price';
+        params.sort_order = 'desc';
+      } else {
+        params.sort_by = 'created_at';
+        params.sort_order = 'desc';
+      }
 
       const result = await listingService.getListings(params);
 
@@ -77,7 +91,10 @@ export default function HomePage() {
   };
 
   const handleFilterChange = (key: string, value: string) => {
-    setFilters({ ...filters, [key]: value });
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
+    // Immediately fetch with new filters (pass override to avoid async state issue)
+    fetchListings(1, { [key]: value });
   };
 
   const clearFilters = () => {
@@ -188,7 +205,11 @@ export default function HomePage() {
           </p>
           <select
             className="px-3 py-1.5 text-sm text-gray-900 border border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-            defaultValue="newest"
+            value={sortBy}
+            onChange={(e) => {
+              setSortBy(e.target.value);
+              fetchListings(1);
+            }}
           >
             <option value="newest">Newest</option>
             <option value="price-low">Price: Low to High</option>

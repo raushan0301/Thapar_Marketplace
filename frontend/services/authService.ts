@@ -61,4 +61,14 @@ export const authService = {
         });
         return response.data;
     },
+
+    // Update profile
+    updateProfile: async (formData: FormData) => {
+        const response = await api.put('/auth/profile', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
 };

@@ -5,6 +5,7 @@ import {
     getMessages,
     getListingMessages,
     markAsRead,
+    markConversationAsRead,
     deleteMessage,
     getUnreadCount,
 } from '../controllers/message.controller';
@@ -19,6 +20,7 @@ router.get('/unread-count', authenticate, getUnreadCount);
 router.get('/user/:otherUserId', authenticate, getMessages);
 router.get('/listing/:listingId', authenticate, getListingMessages);
 router.patch('/:messageId/read', authenticate, markAsRead);
+router.patch('/conversation/:otherUserId/read', authenticate, markConversationAsRead);
 router.delete('/:messageId', authenticate, deleteMessage);
 
 export default router;

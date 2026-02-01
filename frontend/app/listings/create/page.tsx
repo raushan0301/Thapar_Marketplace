@@ -24,7 +24,6 @@ export default function CreateListingPage() {
         condition: '',
         listing_type: 'sell' as 'sell' | 'rent' | 'lost' | 'found',
         location: '',
-        rental_duration: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -98,7 +97,6 @@ export default function CreateListingPage() {
                 condition: formData.condition || undefined,
                 listing_type: formData.listing_type,
                 location: formData.location || undefined,
-                rental_duration: formData.rental_duration || undefined,
                 images,
             });
 
@@ -151,7 +149,7 @@ export default function CreateListingPage() {
                                 setFormData({ ...formData, description: e.target.value })
                             }
                             rows={5}
-                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${errors.description ? 'border-red-500' : 'border-gray-300'
+                            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder:text-gray-500 ${errors.description ? 'border-red-500' : 'border-gray-300'
                                 }`}
                             required
                         />
@@ -172,7 +170,7 @@ export default function CreateListingPage() {
                                 onChange={(e) =>
                                     setFormData({ ...formData, category_id: e.target.value })
                                 }
-                                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.category_id ? 'border-red-500' : 'border-gray-300'
+                                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${errors.category_id ? 'border-red-500' : 'border-gray-300'
                                     }`}
                                 required
                             >
@@ -201,7 +199,7 @@ export default function CreateListingPage() {
                                         listing_type: e.target.value as any,
                                     })
                                 }
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                                 required
                             >
                                 <option value="sell">For Sale</option>
@@ -237,39 +235,25 @@ export default function CreateListingPage() {
                                 onChange={(e) =>
                                     setFormData({ ...formData, condition: e.target.value })
                                 }
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                             >
                                 <option value="">Select Condition</option>
                                 <option value="new">New</option>
-                                <option value="excellent">Excellent</option>
+                                <option value="like_new">Like New</option>
                                 <option value="good">Good</option>
                                 <option value="fair">Fair</option>
                             </select>
                         </div>
                     </div>
 
-                    {/* Location & Rental Duration */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input
-                            label="Location"
-                            type="text"
-                            placeholder="e.g., Hostel A, Room 101"
-                            value={formData.location}
-                            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                        />
-
-                        {formData.listing_type === 'rent' && (
-                            <Input
-                                label="Rental Duration"
-                                type="text"
-                                placeholder="e.g., 1 month, 6 months"
-                                value={formData.rental_duration}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, rental_duration: e.target.value })
-                                }
-                            />
-                        )}
-                    </div>
+                    {/* Location */}
+                    <Input
+                        label="Location"
+                        type="text"
+                        placeholder="e.g., Hostel A, Room 101"
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    />
 
                     {/* Image Upload */}
                     <ImageUpload images={images} setImages={setImages} />

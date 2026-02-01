@@ -1,82 +1,69 @@
 import { Response } from 'express';
-import pool from '../config/database';
+import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
 
 // Get all users (admin only)
 export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { search, is_banned, page = '1', limit = '20' } = req.query;
+        const {
+            search,
+            is_verified,
+            is_banned,
+            sort_by = 'created_at',
+            sort_order = 'desc',
+            page = '1',
+            limit = '20',
+        } = req.query;
 
-        let query = `
-            SELECT id, email, name, phone, department, year, hostel, 
-                   profile_picture, trust_score, is_admin, is_banned, 
-                   created_at, last_login
-            FROM users
-            WHERE 1=1
-        `;
-
-        const params: any[] = [];
-        let paramCount = 0;
-
-        if (search) {
-            paramCount++;
-            query += ` AND (name ILIKE $${paramCount} OR email ILIKE $${paramCount})`;
-            params.push(`%${search}%`);
-        }
-
-        if (is_banned !== undefined) {
-            paramCount++;
-            query += ` AND is_banned = $${paramCount}`;
-            params.push(is_banned === 'true');
-        }
-
-        query += ` ORDER BY created_at DESC`;
-
-        // Pagination
         const pageNum = parseInt(page as string);
         const limitNum = parseInt(limit as string);
         const offset = (pageNum - 1) * limitNum;
 
-        paramCount++;
-        query += ` LIMIT $${paramCount}`;
-        params.push(limitNum);
+        // Build query
+        let query = supabase
+            .from('users')
+            .select('id, email, name, phone, department, year, hostel, profile_picture, trust_score, is_admin, is_verified, is_banned, created_at, last_login', { count: 'exact' });
 
-        paramCount++;
-        query += ` OFFSET $${paramCount}`;
-        params.push(offset);
-
-        const result = await pool.query(query, params);
-
-        // Get total count
-        let countQuery = 'SELECT COUNT(*) FROM users WHERE 1=1';
-        const countParams: any[] = [];
-        let countParamCount = 0;
-
+        // Apply filters
         if (search) {
-            countParamCount++;
-            countQuery += ` AND (name ILIKE $${countParamCount} OR email ILIKE $${countParamCount})`;
-            countParams.push(`%${search}%`);
+            query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+        }
+
+        if (is_verified !== undefined) {
+            query = query.eq('is_verified', is_verified === 'true');
         }
 
         if (is_banned !== undefined) {
-            countParamCount++;
-            countQuery += ` AND is_banned = $${countParamCount}`;
-            countParams.push(is_banned === 'true');
+            query = query.eq('is_banned', is_banned === 'true');
         }
 
-        const countResult = await pool.query(countQuery, countParams);
-        const totalUsers = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalUsers / limitNum);
+        // Apply sorting
+        const ascending = sort_order === 'asc';
+        query = query.order(sort_by as string, { ascending });
+
+        // Apply pagination
+        query = query.range(offset, offset + limitNum - 1);
+
+        const { data: users, error, count } = await query;
+
+        if (error) {
+            console.error('Get all users error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch users',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
             data: {
-                users: result.rows,
+                users: users || [],
                 pagination: {
-                    currentPage: pageNum,
-                    totalPages,
-                    totalUsers,
+                    page: pageNum,
                     limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum),
                 },
             },
         });
@@ -92,13 +79,17 @@ export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void
 // Ban/Unban user
 export const toggleUserBan = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { userId } = req.params;
-        const { is_banned, reason } = req.body;
+        const { user_id } = req.params;
+        const { is_banned, ban_reason } = req.body;
 
         // Check if user exists
-        const user = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+        const { data: user, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user_id)
+            .single();
 
-        if (user.rows.length === 0) {
+        if (fetchError || !user) {
             res.status(404).json({
                 success: false,
                 error: 'User not found',
@@ -106,39 +97,44 @@ export const toggleUserBan = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        // Prevent banning admins
-        if (user.rows[0].is_admin) {
+        if (user.is_admin) {
             res.status(403).json({
                 success: false,
-                error: 'Cannot ban admin users',
+                error: 'Cannot ban an admin user',
             });
             return;
         }
 
-        // Update ban status
-        await pool.query('UPDATE users SET is_banned = $1 WHERE id = $2', [is_banned, userId]);
+        // Update user
+        const { data: updatedUser, error: updateError } = await supabase
+            .from('users')
+            .update({
+                is_banned,
+                ban_reason: is_banned ? ban_reason : null,
+            })
+            .eq('id', user_id)
+            .select()
+            .single();
 
-        // Log the action
-        await pool.query(
-            `INSERT INTO admin_logs (admin_id, action, target_user_id, reason)
-             VALUES ($1, $2, $3, $4)`,
-            [
-                req.user?.userId,
-                is_banned ? 'ban_user' : 'unban_user',
-                userId,
-                reason || null,
-            ]
-        );
+        if (updateError) {
+            console.error('Toggle ban error:', updateError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update user status',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
-            message: is_banned ? 'User banned successfully' : 'User unbanned successfully',
+            message: `User ${is_banned ? 'banned' : 'unbanned'} successfully`,
+            data: { user: updatedUser },
         });
     } catch (error) {
         console.error('Toggle user ban error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to update user ban status',
+            error: 'Failed to update user status',
         });
     }
 };
@@ -146,65 +142,70 @@ export const toggleUserBan = async (req: AuthRequest, res: Response): Promise<vo
 // Get all listings (admin - including inactive)
 export const getAllListingsAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { status, page = '1', limit = '20' } = req.query;
+        const {
+            status,
+            page = '1',
+            limit = '20',
+        } = req.query;
 
-        let query = `
-            SELECT l.*, u.name as seller_name, u.email as seller_email,
-                   c.name as category_name
-            FROM listings l
-            JOIN users u ON l.user_id = u.id
-            JOIN categories c ON l.category_id = c.id
-            WHERE 1=1
-        `;
-
-        const params: any[] = [];
-        let paramCount = 0;
-
-        if (status) {
-            paramCount++;
-            query += ` AND l.status = $${paramCount}`;
-            params.push(status);
-        }
-
-        query += ` ORDER BY l.created_at DESC`;
-
-        // Pagination
         const pageNum = parseInt(page as string);
         const limitNum = parseInt(limit as string);
         const offset = (pageNum - 1) * limitNum;
 
-        paramCount++;
-        query += ` LIMIT $${paramCount}`;
-        params.push(limitNum);
+        // Build query
+        let query = supabase
+            .from('listings')
+            .select(`
+                *,
+                users!user_id (
+                    id,
+                    name,
+                    email,
+                    profile_picture
+                ),
+                categories!category_id (
+                    id,
+                    name,
+                    icon
+                )
+            `, { count: 'exact' });
 
-        paramCount++;
-        query += ` OFFSET $${paramCount}`;
-        params.push(offset);
-
-        const result = await pool.query(query, params);
-
-        // Get total count
-        let countQuery = 'SELECT COUNT(*) FROM listings WHERE 1=1';
-        const countParams: any[] = [];
-
+        // Apply filters
         if (status) {
-            countQuery += ` AND status = $1`;
-            countParams.push(status);
+            query = query.eq('status', status);
         }
 
-        const countResult = await pool.query(countQuery, countParams);
-        const totalListings = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalListings / limitNum);
+        // Apply sorting and pagination
+        query = query
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limitNum - 1);
+
+        const { data: listings, error, count } = await query;
+
+        if (error) {
+            console.error('Get all listings admin error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch listings',
+            });
+            return;
+        }
+
+        // Parse images JSON for each listing
+        const parsedListings = listings?.map(listing => ({
+            ...listing,
+            images: listing.images ? JSON.parse(listing.images) : [],
+        })) || [];
 
         res.status(200).json({
             success: true,
             data: {
-                listings: result.rows,
+                listings: parsedListings,
                 pagination: {
-                    currentPage: pageNum,
-                    totalPages,
-                    totalListings,
+                    page: pageNum,
                     limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum),
                 },
             },
         });
@@ -220,13 +221,16 @@ export const getAllListingsAdmin = async (req: AuthRequest, res: Response): Prom
 // Delete listing (admin)
 export const deleteListingAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { listingId } = req.params;
-        const { reason } = req.body;
+        const { listing_id } = req.params;
 
         // Check if listing exists
-        const listing = await pool.query('SELECT * FROM listings WHERE id = $1', [listingId]);
+        const { data: listing, error: fetchError } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('id', listing_id)
+            .single();
 
-        if (listing.rows.length === 0) {
+        if (fetchError || !listing) {
             res.status(404).json({
                 success: false,
                 error: 'Listing not found',
@@ -235,14 +239,19 @@ export const deleteListingAdmin = async (req: AuthRequest, res: Response): Promi
         }
 
         // Delete listing
-        await pool.query('DELETE FROM listings WHERE id = $1', [listingId]);
+        const { error: deleteError } = await supabase
+            .from('listings')
+            .delete()
+            .eq('id', listing_id);
 
-        // Log the action
-        await pool.query(
-            `INSERT INTO admin_logs (admin_id, action, target_listing_id, reason)
-             VALUES ($1, $2, $3, $4)`,
-            [req.user?.userId, 'delete_listing', listingId, reason || null]
-        );
+        if (deleteError) {
+            console.error('Delete listing admin error:', deleteError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete listing',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
@@ -260,87 +269,93 @@ export const deleteListingAdmin = async (req: AuthRequest, res: Response): Promi
 // Get analytics
 export const getAnalytics = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        // Total users
-        const usersResult = await pool.query('SELECT COUNT(*) as total FROM users');
-        const totalUsers = parseInt(usersResult.rows[0].total);
+        // Get total users
+        const { count: totalUsers } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true });
 
-        // Active users (logged in within last 30 days)
-        const activeUsersResult = await pool.query(
-            "SELECT COUNT(*) as total FROM users WHERE last_login > NOW() - INTERVAL '30 days'"
-        );
-        const activeUsers = parseInt(activeUsersResult.rows[0].total);
+        // Get verified users
+        const { count: verifiedUsers } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_verified', true);
 
-        // Total listings
-        const listingsResult = await pool.query('SELECT COUNT(*) as total FROM listings');
-        const totalListings = parseInt(listingsResult.rows[0].total);
+        // Get banned users
+        const { count: bannedUsers } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_banned', true);
 
-        // Active listings
-        const activeListingsResult = await pool.query(
-            "SELECT COUNT(*) as total FROM listings WHERE status = 'active'"
-        );
-        const activeListings = parseInt(activeListingsResult.rows[0].total);
+        // Get total listings
+        const { count: totalListings } = await supabase
+            .from('listings')
+            .select('*', { count: 'exact', head: true });
 
-        // Sold/Rented listings
-        const soldListingsResult = await pool.query(
-            "SELECT COUNT(*) as total FROM listings WHERE status IN ('sold', 'rented')"
-        );
-        const soldListings = parseInt(soldListingsResult.rows[0].total);
+        // Get active listings
+        const { count: activeListings } = await supabase
+            .from('listings')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'active');
 
-        // Total messages
-        const messagesResult = await pool.query('SELECT COUNT(*) as total FROM messages');
-        const totalMessages = parseInt(messagesResult.rows[0].total);
+        // Get sold listings
+        const { count: soldListings } = await supabase
+            .from('listings')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'sold');
 
-        // Total ratings
-        const ratingsResult = await pool.query('SELECT COUNT(*) as total FROM ratings');
-        const totalRatings = parseInt(ratingsResult.rows[0].total);
+        // Get rented listings
+        const { count: rentedListings } = await supabase
+            .from('listings')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'rented');
 
-        // Average rating
-        const avgRatingResult = await pool.query('SELECT AVG(rating) as avg FROM ratings');
-        const avgRating = parseFloat(avgRatingResult.rows[0].avg || 0);
+        // Get total messages
+        const { count: totalMessages } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true });
 
-        // Listings by category
-        const categoryStatsResult = await pool.query(`
-            SELECT c.name, COUNT(l.id) as count
-            FROM categories c
-            LEFT JOIN listings l ON c.id = l.category_id
-            GROUP BY c.id, c.name
-            ORDER BY count DESC
-        `);
+        // Get total ratings
+        const { count: totalRatings } = await supabase
+            .from('ratings')
+            .select('*', { count: 'exact', head: true });
 
-        // Recent signups (last 7 days)
-        const recentSignupsResult = await pool.query(`
-            SELECT DATE(created_at) as date, COUNT(*) as count
-            FROM users
-            WHERE created_at > NOW() - INTERVAL '7 days'
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-        `);
+        // Get listings by category
+        const { data: listingsByCategory } = await supabase
+            .from('listings')
+            .select(`
+                category_id,
+                categories!category_id (
+                    name
+                )
+            `);
 
-        // Recent listings (last 7 days)
-        const recentListingsResult = await pool.query(`
-            SELECT DATE(created_at) as date, COUNT(*) as count
-            FROM listings
-            WHERE created_at > NOW() - INTERVAL '7 days'
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-        `);
+        const categoryStats = listingsByCategory?.reduce((acc: any, listing: any) => {
+            const categoryName = listing.categories?.name || 'Unknown';
+            acc[categoryName] = (acc[categoryName] || 0) + 1;
+            return acc;
+        }, {});
 
         res.status(200).json({
             success: true,
             data: {
-                overview: {
-                    totalUsers,
-                    activeUsers,
-                    totalListings,
-                    activeListings,
-                    soldListings,
-                    totalMessages,
-                    totalRatings,
-                    avgRating: avgRating.toFixed(2),
+                users: {
+                    total: totalUsers || 0,
+                    verified: verifiedUsers || 0,
+                    banned: bannedUsers || 0,
                 },
-                categoryStats: categoryStatsResult.rows,
-                recentSignups: recentSignupsResult.rows,
-                recentListings: recentListingsResult.rows,
+                listings: {
+                    total: totalListings || 0,
+                    active: activeListings || 0,
+                    sold: soldListings || 0,
+                    rented: rentedListings || 0,
+                    by_category: categoryStats || {},
+                },
+                messages: {
+                    total: totalMessages || 0,
+                },
+                ratings: {
+                    total: totalRatings || 0,
+                },
             },
         });
     } catch (error) {
@@ -361,28 +376,37 @@ export const getAdminLogs = async (req: AuthRequest, res: Response): Promise<voi
         const limitNum = parseInt(limit as string);
         const offset = (pageNum - 1) * limitNum;
 
-        const result = await pool.query(
-            `SELECT al.*, u.name as admin_name, u.email as admin_email
-             FROM admin_logs al
-             JOIN users u ON al.admin_id = u.id
-             ORDER BY al.created_at DESC
-             LIMIT $1 OFFSET $2`,
-            [limitNum, offset]
-        );
+        const { data: logs, error, count } = await supabase
+            .from('admin_logs')
+            .select(`
+                *,
+                admin:users!admin_id (
+                    id,
+                    name,
+                    email
+                )
+            `, { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limitNum - 1);
 
-        const countResult = await pool.query('SELECT COUNT(*) FROM admin_logs');
-        const totalLogs = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalLogs / limitNum);
+        if (error) {
+            console.error('Get admin logs error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch admin logs',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
             data: {
-                logs: result.rows,
+                logs: logs || [],
                 pagination: {
-                    currentPage: pageNum,
-                    totalPages,
-                    totalLogs,
+                    page: pageNum,
                     limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum),
                 },
             },
         });
@@ -398,27 +422,39 @@ export const getAdminLogs = async (req: AuthRequest, res: Response): Promise<voi
 // Create category
 export const createCategory = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { name, icon, listing_type } = req.body;
+        const { name, icon } = req.body;
 
-        if (!name || !listing_type) {
+        if (!name) {
             res.status(400).json({
                 success: false,
-                error: 'Missing required fields',
+                error: 'Category name is required',
             });
             return;
         }
 
-        const result = await pool.query(
-            `INSERT INTO categories (name, icon, listing_type)
-             VALUES ($1, $2, $3)
-             RETURNING *`,
-            [name, icon || null, listing_type]
-        );
+        // Insert category
+        const { data: category, error } = await supabase
+            .from('categories')
+            .insert({
+                name,
+                icon: icon || null,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Create category error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create category',
+            });
+            return;
+        }
 
         res.status(201).json({
             success: true,
             message: 'Category created successfully',
-            data: { category: result.rows[0] },
+            data: { category },
         });
     } catch (error) {
         console.error('Create category error:', error);
@@ -432,46 +468,17 @@ export const createCategory = async (req: AuthRequest, res: Response): Promise<v
 // Update category
 export const updateCategory = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { categoryId } = req.params;
+        const { category_id } = req.params;
         const { name, icon } = req.body;
 
-        const updates: string[] = [];
-        const params: any[] = [];
-        let paramCount = 0;
+        // Check if category exists
+        const { data: category, error: fetchError } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('id', category_id)
+            .single();
 
-        if (name) {
-            paramCount++;
-            updates.push(`name = $${paramCount}`);
-            params.push(name);
-        }
-
-        if (icon !== undefined) {
-            paramCount++;
-            updates.push(`icon = $${paramCount}`);
-            params.push(icon);
-        }
-
-        if (updates.length === 0) {
-            res.status(400).json({
-                success: false,
-                error: 'No fields to update',
-            });
-            return;
-        }
-
-        paramCount++;
-        params.push(categoryId);
-
-        const query = `
-            UPDATE categories 
-            SET ${updates.join(', ')}
-            WHERE id = $${paramCount}
-            RETURNING *
-        `;
-
-        const result = await pool.query(query, params);
-
-        if (result.rows.length === 0) {
+        if (fetchError || !category) {
             res.status(404).json({
                 success: false,
                 error: 'Category not found',
@@ -479,10 +486,30 @@ export const updateCategory = async (req: AuthRequest, res: Response): Promise<v
             return;
         }
 
+        // Update category
+        const { data: updatedCategory, error: updateError } = await supabase
+            .from('categories')
+            .update({
+                name: name || category.name,
+                icon: icon !== undefined ? icon : category.icon,
+            })
+            .eq('id', category_id)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('Update category error:', updateError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update category',
+            });
+            return;
+        }
+
         res.status(200).json({
             success: true,
             message: 'Category updated successfully',
-            data: { category: result.rows[0] },
+            data: { category: updatedCategory },
         });
     } catch (error) {
         console.error('Update category error:', error);
@@ -496,15 +523,15 @@ export const updateCategory = async (req: AuthRequest, res: Response): Promise<v
 // Delete category
 export const deleteCategory = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { categoryId } = req.params;
+        const { category_id } = req.params;
 
         // Check if category has listings
-        const listingsCount = await pool.query(
-            'SELECT COUNT(*) FROM listings WHERE category_id = $1',
-            [categoryId]
-        );
+        const { count } = await supabase
+            .from('listings')
+            .select('*', { count: 'exact', head: true })
+            .eq('category_id', category_id);
 
-        if (parseInt(listingsCount.rows[0].count) > 0) {
+        if (count && count > 0) {
             res.status(400).json({
                 success: false,
                 error: 'Cannot delete category with existing listings',
@@ -512,7 +539,20 @@ export const deleteCategory = async (req: AuthRequest, res: Response): Promise<v
             return;
         }
 
-        await pool.query('DELETE FROM categories WHERE id = $1', [categoryId]);
+        // Delete category
+        const { error } = await supabase
+            .from('categories')
+            .delete()
+            .eq('id', category_id);
+
+        if (error) {
+            console.error('Delete category error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete category',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,

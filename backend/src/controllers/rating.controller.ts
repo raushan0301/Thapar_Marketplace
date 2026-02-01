@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import pool from '../config/database';
+import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
 
 // Create rating
@@ -8,7 +8,6 @@ export const createRating = async (req: AuthRequest, res: Response): Promise<voi
         const raterId = req.user?.userId;
         const { rated_user_id, listing_id, rating, review } = req.body;
 
-        // Validate required fields
         if (!rated_user_id || !rating) {
             res.status(400).json({
                 success: false,
@@ -17,7 +16,6 @@ export const createRating = async (req: AuthRequest, res: Response): Promise<voi
             return;
         }
 
-        // Validate rating value
         if (rating < 1 || rating > 5) {
             res.status(400).json({
                 success: false,
@@ -26,7 +24,6 @@ export const createRating = async (req: AuthRequest, res: Response): Promise<voi
             return;
         }
 
-        // Check if user is trying to rate themselves
         if (raterId === rated_user_id) {
             res.status(400).json({
                 success: false,
@@ -35,58 +32,74 @@ export const createRating = async (req: AuthRequest, res: Response): Promise<voi
             return;
         }
 
-        // Check if rated user exists
-        const userExists = await pool.query('SELECT id FROM users WHERE id = $1', [
-            rated_user_id,
-        ]);
+        // Check if user has already rated this user for this listing
+        const { data: existingRating } = await supabase
+            .from('ratings')
+            .select('*')
+            .eq('rater_id', raterId)
+            .eq('rated_user_id', rated_user_id)
+            .eq('listing_id', listing_id || null)
+            .single();
 
-        if (userExists.rows.length === 0) {
-            res.status(404).json({
+        if (existingRating) {
+            res.status(409).json({
                 success: false,
-                error: 'User not found',
+                error: 'You have already rated this user for this listing',
             });
             return;
         }
 
-        // Check if user has already rated this user for this listing
-        if (listing_id) {
-            const existingRating = await pool.query(
-                'SELECT id FROM ratings WHERE rater_id = $1 AND rated_user_id = $2 AND listing_id = $3',
-                [raterId, rated_user_id, listing_id]
-            );
-
-            if (existingRating.rows.length > 0) {
-                res.status(409).json({
-                    success: false,
-                    error: 'You have already rated this user for this listing',
-                });
-                return;
-            }
-        }
-
         // Insert rating
-        const result = await pool.query(
-            `INSERT INTO ratings (rater_id, rated_user_id, listing_id, rating, review)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING *`,
-            [raterId, rated_user_id, listing_id || null, rating, review || null]
-        );
+        const { data: newRating, error } = await supabase
+            .from('ratings')
+            .insert({
+                rater_id: raterId,
+                rated_user_id,
+                listing_id: listing_id || null,
+                rating,
+                review: review || null,
+            })
+            .select(`
+                *,
+                rater:users!rater_id (
+                    id,
+                    name,
+                    profile_picture
+                ),
+                rated_user:users!rated_user_id (
+                    id,
+                    name,
+                    profile_picture
+                ),
+                listing:listings!listing_id (
+                    id,
+                    title
+                )
+            `)
+            .single();
 
-        const newRating = result.rows[0];
+        if (error) {
+            console.error('Create rating error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to create rating',
+            });
+            return;
+        }
 
         // Update user's trust score
         await updateUserTrustScore(rated_user_id);
 
         res.status(201).json({
             success: true,
-            message: 'Rating submitted successfully',
+            message: 'Rating created successfully',
             data: { rating: newRating },
         });
     } catch (error) {
         console.error('Create rating error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to submit rating',
+            error: 'Failed to create rating',
         });
     }
 };
@@ -94,7 +107,7 @@ export const createRating = async (req: AuthRequest, res: Response): Promise<voi
 // Get ratings for a user
 export const getUserRatings = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { userId } = req.params;
+        const { user_id } = req.params;
         const { page = '1', limit = '20' } = req.query;
 
         const pageNum = parseInt(page as string);
@@ -102,63 +115,54 @@ export const getUserRatings = async (req: AuthRequest, res: Response): Promise<v
         const offset = (pageNum - 1) * limitNum;
 
         // Get ratings
-        const result = await pool.query(
-            `SELECT r.*, 
-                    u.name as rater_name, u.profile_picture as rater_picture,
-                    l.title as listing_title
-             FROM ratings r
-             LEFT JOIN users u ON r.rater_id = u.id
-             LEFT JOIN listings l ON r.listing_id = l.id
-             WHERE r.rated_user_id = $1
-             ORDER BY r.created_at DESC
-             LIMIT $2 OFFSET $3`,
-            [userId, limitNum, offset]
-        );
+        const { data: ratings, error, count } = await supabase
+            .from('ratings')
+            .select(`
+                *,
+                rater:users!rater_id (
+                    id,
+                    name,
+                    profile_picture
+                ),
+                listing:listings!listing_id (
+                    id,
+                    title
+                )
+            `, { count: 'exact' })
+            .eq('rated_user_id', user_id)
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limitNum - 1);
 
-        // Get rating statistics
-        const statsResult = await pool.query(
-            `SELECT 
-                COUNT(*) as total_ratings,
-                AVG(rating) as average_rating,
-                COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
-                COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
-                COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
-                COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
-                COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star
-             FROM ratings
-             WHERE rated_user_id = $1`,
-            [userId]
-        );
+        if (error) {
+            console.error('Get user ratings error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch ratings',
+            });
+            return;
+        }
 
-        const stats = statsResult.rows[0];
+        // Calculate average rating
+        const { data: avgData } = await supabase
+            .from('ratings')
+            .select('rating')
+            .eq('rated_user_id', user_id);
 
-        // Get total count for pagination
-        const countResult = await pool.query(
-            'SELECT COUNT(*) FROM ratings WHERE rated_user_id = $1',
-            [userId]
-        );
-
-        const totalRatings = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalRatings / limitNum);
+        const average_rating = avgData && avgData.length > 0
+            ? avgData.reduce((sum, r) => sum + r.rating, 0) / avgData.length
+            : 0;
 
         res.status(200).json({
             success: true,
             data: {
-                ratings: result.rows,
-                statistics: {
-                    total_ratings: parseInt(stats.total_ratings),
-                    average_rating: parseFloat(stats.average_rating || 0).toFixed(2),
-                    five_star: parseInt(stats.five_star),
-                    four_star: parseInt(stats.four_star),
-                    three_star: parseInt(stats.three_star),
-                    two_star: parseInt(stats.two_star),
-                    one_star: parseInt(stats.one_star),
-                },
+                ratings: ratings || [],
+                average_rating: parseFloat(average_rating.toFixed(2)),
+                total_ratings: count || 0,
                 pagination: {
-                    currentPage: pageNum,
-                    totalPages,
-                    totalRatings,
+                    page: pageNum,
                     limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum),
                 },
             },
         });
@@ -178,44 +182,36 @@ export const getRatingsGivenByUser = async (
 ): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const { page = '1', limit = '20' } = req.query;
 
-        const pageNum = parseInt(page as string);
-        const limitNum = parseInt(limit as string);
-        const offset = (pageNum - 1) * limitNum;
+        const { data: ratings, error } = await supabase
+            .from('ratings')
+            .select(`
+                *,
+                rated_user:users!rated_user_id (
+                    id,
+                    name,
+                    profile_picture
+                ),
+                listing:listings!listing_id (
+                    id,
+                    title
+                )
+            `)
+            .eq('rater_id', userId)
+            .order('created_at', { ascending: false });
 
-        const result = await pool.query(
-            `SELECT r.*, 
-                    u.name as rated_user_name, u.profile_picture as rated_user_picture,
-                    l.title as listing_title
-             FROM ratings r
-             LEFT JOIN users u ON r.rated_user_id = u.id
-             LEFT JOIN listings l ON r.listing_id = l.id
-             WHERE r.rater_id = $1
-             ORDER BY r.created_at DESC
-             LIMIT $2 OFFSET $3`,
-            [userId, limitNum, offset]
-        );
-
-        const countResult = await pool.query(
-            'SELECT COUNT(*) FROM ratings WHERE rater_id = $1',
-            [userId]
-        );
-
-        const totalRatings = parseInt(countResult.rows[0].count);
-        const totalPages = Math.ceil(totalRatings / limitNum);
+        if (error) {
+            console.error('Get ratings given error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch ratings',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
-            data: {
-                ratings: result.rows,
-                pagination: {
-                    currentPage: pageNum,
-                    totalPages,
-                    totalRatings,
-                    limit: limitNum,
-                },
-            },
+            data: { ratings: ratings || [] },
         });
     } catch (error) {
         console.error('Get ratings given error:', error);
@@ -230,11 +226,10 @@ export const getRatingsGivenByUser = async (
 export const updateRating = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const { ratingId } = req.params;
+        const { rating_id } = req.params;
         const { rating, review } = req.body;
 
-        // Validate rating value
-        if (rating && (rating < 1 || rating > 5)) {
+        if (!rating || rating < 1 || rating > 5) {
             res.status(400).json({
                 success: false,
                 error: 'Rating must be between 1 and 5',
@@ -242,67 +237,66 @@ export const updateRating = async (req: AuthRequest, res: Response): Promise<voi
             return;
         }
 
-        // Check if rating exists and user is the rater
-        const existingRating = await pool.query(
-            'SELECT * FROM ratings WHERE id = $1 AND rater_id = $2',
-            [ratingId, userId]
-        );
+        // Check if rating belongs to user
+        const { data: existingRating, error: fetchError } = await supabase
+            .from('ratings')
+            .select('*')
+            .eq('id', rating_id)
+            .eq('rater_id', userId)
+            .single();
 
-        if (existingRating.rows.length === 0) {
+        if (fetchError || !existingRating) {
             res.status(404).json({
                 success: false,
-                error: 'Rating not found or you do not have permission to edit it',
+                error: 'Rating not found or you do not have permission to update it',
             });
             return;
         }
 
-        // Build update query
-        const updates: string[] = [];
-        const params: any[] = [];
-        let paramCount = 0;
+        // Update rating
+        const { data: updatedRating, error: updateError } = await supabase
+            .from('ratings')
+            .update({
+                rating,
+                review: review || existingRating.review,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', rating_id)
+            .select(`
+                *,
+                rater:users!rater_id (
+                    id,
+                    name,
+                    profile_picture
+                ),
+                rated_user:users!rated_user_id (
+                    id,
+                    name,
+                    profile_picture
+                ),
+                listing:listings!listing_id (
+                    id,
+                    title
+                )
+            `)
+            .single();
 
-        if (rating) {
-            paramCount++;
-            updates.push(`rating = $${paramCount}`);
-            params.push(rating);
-        }
-
-        if (review !== undefined) {
-            paramCount++;
-            updates.push(`review = $${paramCount}`);
-            params.push(review);
-        }
-
-        if (updates.length === 0) {
-            res.status(400).json({
+        if (updateError) {
+            console.error('Update rating error:', updateError);
+            res.status(500).json({
                 success: false,
-                error: 'No fields to update',
+                error: 'Failed to update rating',
             });
             return;
         }
-
-        paramCount++;
-        updates.push(`updated_at = NOW()`);
-
-        paramCount++;
-        params.push(ratingId);
-
-        const query = `
-            UPDATE ratings 
-            SET ${updates.join(', ')}
-            WHERE id = $${paramCount}
-            RETURNING *
-        `;
-
-        const result = await pool.query(query, params);
 
         // Update user's trust score
-        await updateUserTrustScore(existingRating.rows[0].rated_user_id);
+        await updateUserTrustScore(existingRating.rated_user_id);
 
         res.status(200).json({
             success: true,
             message: 'Rating updated successfully',
-            data: { rating: result.rows[0] },
+            data: { rating: updatedRating },
         });
     } catch (error) {
         console.error('Update rating error:', error);
@@ -317,15 +311,17 @@ export const updateRating = async (req: AuthRequest, res: Response): Promise<voi
 export const deleteRating = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const { ratingId } = req.params;
+        const { rating_id } = req.params;
 
-        // Check if rating exists and user is the rater
-        const existingRating = await pool.query(
-            'SELECT * FROM ratings WHERE id = $1 AND rater_id = $2',
-            [ratingId, userId]
-        );
+        // Check if rating belongs to user
+        const { data: rating, error: fetchError } = await supabase
+            .from('ratings')
+            .select('*')
+            .eq('id', rating_id)
+            .eq('rater_id', userId)
+            .single();
 
-        if (existingRating.rows.length === 0) {
+        if (fetchError || !rating) {
             res.status(404).json({
                 success: false,
                 error: 'Rating not found or you do not have permission to delete it',
@@ -333,13 +329,25 @@ export const deleteRating = async (req: AuthRequest, res: Response): Promise<voi
             return;
         }
 
-        const ratedUserId = existingRating.rows[0].rated_user_id;
+        const rated_user_id = rating.rated_user_id;
 
         // Delete rating
-        await pool.query('DELETE FROM ratings WHERE id = $1', [ratingId]);
+        const { error: deleteError } = await supabase
+            .from('ratings')
+            .delete()
+            .eq('id', rating_id);
+
+        if (deleteError) {
+            console.error('Delete rating error:', deleteError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete rating',
+            });
+            return;
+        }
 
         // Update user's trust score
-        await updateUserTrustScore(ratedUserId);
+        await updateUserTrustScore(rated_user_id);
 
         res.status(200).json({
             success: true,
@@ -355,19 +363,35 @@ export const deleteRating = async (req: AuthRequest, res: Response): Promise<voi
 };
 
 // Helper function to update user's trust score
-const updateUserTrustScore = async (userId: string): Promise<void> => {
+async function updateUserTrustScore(userId: string): Promise<void> {
     try {
-        const result = await pool.query(
-            'SELECT AVG(rating) as avg_rating FROM ratings WHERE rated_user_id = $1',
-            [userId]
-        );
+        // Get all ratings for the user
+        const { data: ratings } = await supabase
+            .from('ratings')
+            .select('rating')
+            .eq('rated_user_id', userId);
 
-        const avgRating = result.rows[0].avg_rating || 0;
+        if (!ratings || ratings.length === 0) {
+            // No ratings, set trust score to default (50)
+            await supabase
+                .from('users')
+                .update({ trust_score: 50 })
+                .eq('id', userId);
+            return;
+        }
 
-        await pool.query('UPDATE users SET trust_score = $1 WHERE id = $2', [avgRating, userId]);
+        // Calculate average rating
+        const avgRating = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
 
-        console.log(`✅ Updated trust score for user ${userId}: ${avgRating}`);
+        // Convert to trust score (1-5 rating to 0-100 score)
+        const trustScore = Math.round((avgRating / 5) * 100);
+
+        // Update user's trust score
+        await supabase
+            .from('users')
+            .update({ trust_score: trustScore })
+            .eq('id', userId);
     } catch (error) {
-        console.error('Error updating trust score:', error);
+        console.error('Update trust score error:', error);
     }
-};
+}

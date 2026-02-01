@@ -15,10 +15,8 @@ interface ListingCardProps {
         location?: string;
         views: number;
         created_at: string;
-        user: {
-            name: string;
-            profile_picture?: string;
-        };
+        seller_name?: string;
+        seller_profile_picture?: string;
     };
 }
 
@@ -75,7 +73,7 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
                         </div>
                         <div className="flex items-center gap-1">
                             <User size={14} />
-                            <span>{listing.user?.name || 'Unknown'}</span>
+                            <span>{listing.seller_name || 'Unknown'}</span>
                         </div>
                     </div>
                 </div>

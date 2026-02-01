@@ -8,7 +8,12 @@ export const messageService = {
         message: string;
         image_url?: string;
     }) => {
-        const response = await api.post('/messages', data);
+        // Transform 'message' to 'content' for backend
+        const { message, ...rest } = data;
+        const response = await api.post('/messages', {
+            ...rest,
+            content: message,
+        });
         return response.data;
     },
 
@@ -33,6 +38,12 @@ export const messageService = {
     // Mark message as read
     markAsRead: async (messageId: string) => {
         const response = await api.patch(`/messages/${messageId}/read`);
+        return response.data;
+    },
+
+    // Mark all messages in a conversation as read
+    markConversationAsRead: async (otherUserId: string) => {
+        const response = await api.patch(`/messages/conversation/${otherUserId}/read`);
         return response.data;
     },
 

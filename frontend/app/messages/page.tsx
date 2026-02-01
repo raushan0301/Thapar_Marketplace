@@ -21,6 +21,7 @@ function MessagesContent() {
     const [newMessage, setNewMessage] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -59,36 +60,93 @@ function MessagesContent() {
     useEffect(() => {
         // Check if there's a user parameter in the URL
         const userId = searchParams.get('user');
+        const listingId = searchParams.get('listing');
+
         if (userId && conversations.length > 0) {
             const conv = conversations.find((c) => c.other_user_id === userId);
-            if (conv) {
+            // Only select if it's not already selected to prevent infinite loop
+            if (conv && selectedConversation?.other_user_id !== userId) {
                 handleSelectConversation(conv);
+            } else if (!conv) {
+                // Create a new conversation placeholder
+                createNewConversation(userId, listingId);
             }
+        } else if (userId && conversations.length === 0 && !isLoading) {
+            // No conversations exist yet, create new one
+            createNewConversation(userId, listingId);
         }
-    }, [searchParams, conversations]);
+    }, [searchParams, conversations, isLoading]);
 
     const fetchConversations = async () => {
         try {
+            setError(null);
+            console.log('📬 Fetching conversations...');
             const result = await messageService.getConversations();
+            console.log('✅ Conversations result:', result);
             if (result.success) {
                 setConversations(result.data.conversations);
+                console.log(`✅ Loaded ${result.data.conversations.length} conversations`);
+            } else {
+                setError(result.error || 'Failed to load conversations');
             }
         } catch (error: any) {
             const errorMessage = handleApiError(error);
-            console.error('Failed to fetch conversations:', errorMessage);
+            console.error('❌ Failed to fetch conversations:', errorMessage, error);
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleSelectConversation = async (conversation: any) => {
+        console.log('🔍 Selected conversation:', conversation);
+        console.log('🔍 other_user_id:', conversation.other_user_id);
+
+        if (!conversation.other_user_id) {
+            console.error('❌ No other_user_id in conversation:', conversation);
+            setError('Invalid conversation - missing user ID');
+            return;
+        }
+
         setSelectedConversation(conversation);
         setIsLoading(true);
 
         try {
             const result = await messageService.getMessages(conversation.other_user_id);
             if (result.success) {
-                setMessages(result.data.messages);
+                // Reverse messages so newest appear at bottom (like WhatsApp)
+                const reversedMessages = result.data.messages.reverse();
+                setMessages(reversedMessages);
+
+                // Mark all unread messages as read
+                const unreadMessages = reversedMessages.filter(
+                    (msg: any) => msg.receiver_id === user?.id && !msg.is_read
+                );
+
+                // Mark all messages in conversation as read with single API call
+                if (unreadMessages.length > 0) {
+                    try {
+                        await messageService.markConversationAsRead(conversation.other_user_id);
+                        // Update local message state to show green tick immediately
+                        unreadMessages.forEach((msg: any) => {
+                            msg.is_read = true;
+                        });
+                        // Update messages state with read status
+                        setMessages([...reversedMessages]);
+                    } catch (err) {
+                        console.error('Failed to mark conversation as read:', err);
+                    }
+                }
+
+                // Update the conversation's unread count to 0
+                setConversations(prevConvs =>
+                    prevConvs.map(conv =>
+                        conv.other_user_id === conversation.other_user_id
+                            ? { ...conv, unread_count: 0 }
+                            : conv
+                    )
+                );
+
                 scrollToBottom();
 
                 // Join chat room via Socket.IO
@@ -100,6 +158,24 @@ function MessagesContent() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const createNewConversation = async (otherUserId: string, listingId: string | null) => {
+        // Create a temporary conversation object
+        const tempConversation = {
+            other_user_id: otherUserId,
+            other_user_name: 'Loading...',
+            other_user_picture: null,
+            last_message: '',
+            last_message_time: new Date().toISOString(),
+            unread_count: 0,
+        };
+
+        setSelectedConversation(tempConversation);
+        setMessages([]);
+
+        // Join chat room
+        socketService.joinChat(`chat_${user?.id}_${otherUserId}`);
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
@@ -169,7 +245,7 @@ function MessagesContent() {
                             } w-full md:w-80 bg-white border-r border-gray-200 flex flex-col`}
                     >
                         <div className="p-4 border-b border-gray-200">
-                            <h2 className="text-xl font-semibold">Messages</h2>
+                            <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
                         </div>
 
                         <div className="flex-grow overflow-y-auto">
@@ -185,6 +261,24 @@ function MessagesContent() {
                                         </div>
                                     ))}
                                 </div>
+                            ) : error ? (
+                                <div className="text-center py-12 px-4">
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                                        <MessageSquare size={48} className="mx-auto text-red-300 mb-4" />
+                                        <p className="text-red-600 font-medium mb-2">Failed to Load Conversations</p>
+                                        <p className="text-sm text-red-500 mb-4">{error}</p>
+                                        <Button
+                                            onClick={() => {
+                                                setError(null);
+                                                setIsLoading(true);
+                                                fetchConversations();
+                                            }}
+                                            variant="secondary"
+                                        >
+                                            Try Again
+                                        </Button>
+                                    </div>
+                                </div>
                             ) : conversations.length === 0 ? (
                                 <div className="text-center py-12 px-4">
                                     <MessageSquare size={48} className="mx-auto text-gray-300 mb-4" />
@@ -199,8 +293,8 @@ function MessagesContent() {
                                         key={conv.other_user_id}
                                         onClick={() => handleSelectConversation(conv)}
                                         className={`w-full p-4 flex items-center hover:bg-gray-50 transition-colors ${selectedConversation?.other_user_id === conv.other_user_id
-                                                ? 'bg-blue-50'
-                                                : ''
+                                            ? 'bg-blue-50'
+                                            : ''
                                             }`}
                                     >
                                         {conv.other_user_picture ? (
@@ -230,7 +324,7 @@ function MessagesContent() {
                                             </p>
                                         </div>
                                         {conv.unread_count > 0 && (
-                                            <div className="ml-2 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs">
+                                            <div className="ml-2 min-w-[1.5rem] h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-semibold px-2">
                                                 {conv.unread_count}
                                             </div>
                                         )}
@@ -297,7 +391,7 @@ function MessagesContent() {
                                             value={newMessage}
                                             onChange={(e) => setNewMessage(e.target.value)}
                                             placeholder="Type a message..."
-                                            className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
                                         />
                                         <Button type="submit" isLoading={isSending} disabled={!newMessage.trim()}>
                                             <Send size={20} />

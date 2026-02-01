@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import pool from '../config/database';
+import { supabase } from '../config/supabase';
 import { generateToken, generateVerificationToken } from '../services/jwt.service';
 import {
     sendVerificationEmail,
@@ -8,6 +8,7 @@ import {
     sendPasswordResetEmail,
 } from '../services/email.service';
 import { AuthRequest, UserRegistration, UserLogin } from '../types';
+import { uploadImage } from '../services/cloudinary.service';
 
 // Register new user
 export const register = async (req: Request, res: Response): Promise<void> => {
@@ -16,9 +17,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
             req.body;
 
         // Check if user already exists
-        const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
 
-        if (existingUser.rows.length > 0) {
+        if (existingUser) {
             res.status(409).json({
                 success: false,
                 error: 'User with this email already exists',
@@ -35,24 +40,30 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         const verification_token_expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
         // Insert user
-        const result = await pool.query(
-            `INSERT INTO users (email, password_hash, name, phone, department, year, hostel, verification_token, verification_token_expiry)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, email, name, is_verified, created_at`,
-            [
+        const { data: user, error } = await supabase
+            .from('users')
+            .insert({
                 email,
                 password_hash,
                 name,
-                phone || null,
-                department || null,
-                year || null,
-                hostel || null,
+                phone: phone || null,
+                department: department || null,
+                year: year || null,
+                hostel: hostel || null,
                 verification_token,
-                verification_token_expiry,
-            ]
-        );
+                verification_token_expiry: verification_token_expiry.toISOString(),
+            })
+            .select('id, email, name, is_verified, created_at')
+            .single();
 
-        const user = result.rows[0];
+        if (error) {
+            console.error('Database error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Registration failed. Please try again.',
+            });
+            return;
+        }
 
         // Send verification email
         try {
@@ -88,12 +99,15 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
     try {
         const { email, otp } = req.body;
 
-        const result = await pool.query(
-            `SELECT * FROM users WHERE email = $1 AND verification_token = $2 AND verification_token_expiry > NOW()`,
-            [email, otp]
-        );
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .eq('verification_token', otp)
+            .gt('verification_token_expiry', new Date().toISOString())
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !user) {
             res.status(400).json({
                 success: false,
                 error: 'Invalid or expired verification code',
@@ -101,13 +115,24 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
             return;
         }
 
-        const user = result.rows[0];
-
         // Update user as verified
-        await pool.query(
-            `UPDATE users SET is_verified = true, verification_token = NULL, verification_token_expiry = NULL WHERE id = $1`,
-            [user.id]
-        );
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({
+                is_verified: true,
+                verification_token: null,
+                verification_token_expiry: null,
+            })
+            .eq('id', user.id);
+
+        if (updateError) {
+            console.error('Update error:', updateError);
+            res.status(500).json({
+                success: false,
+                error: 'Verification failed. Please try again.',
+            });
+            return;
+        }
 
         // Send welcome email
         try {
@@ -117,11 +142,7 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
         }
 
         // Generate JWT token
-        const token = generateToken({
-            userId: user.id,
-            email: user.email,
-            isAdmin: user.is_admin,
-        });
+        const token = generateToken({ userId: user.id, email: user.email, isAdmin: user.is_admin || false });
 
         res.status(200).json({
             success: true,
@@ -153,17 +174,19 @@ export const resendVerificationOTP = async (
     try {
         const { email } = req.body;
 
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !user) {
             res.status(404).json({
                 success: false,
                 error: 'User not found',
             });
             return;
         }
-
-        const user = result.rows[0];
 
         if (user.is_verified) {
             res.status(400).json({
@@ -173,21 +196,34 @@ export const resendVerificationOTP = async (
             return;
         }
 
-        // Generate new OTP
+        // Generate new verification token
         const verification_token = generateVerificationToken();
         const verification_token_expiry = new Date(Date.now() + 15 * 60 * 1000);
 
-        await pool.query(
-            `UPDATE users SET verification_token = $1, verification_token_expiry = $2 WHERE id = $3`,
-            [verification_token, verification_token_expiry, user.id]
-        );
+        // Update user with new token
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({
+                verification_token,
+                verification_token_expiry: verification_token_expiry.toISOString(),
+            })
+            .eq('id', user.id);
+
+        if (updateError) {
+            console.error('Update error:', updateError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to resend verification code',
+            });
+            return;
+        }
 
         // Send verification email
         await sendVerificationEmail(user.email, user.name, verification_token);
 
         res.status(200).json({
             success: true,
-            message: 'Verification code sent to your email',
+            message: 'Verification code sent successfully!',
         });
     } catch (error) {
         console.error('Resend OTP error:', error);
@@ -203,10 +239,14 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const { email, password }: UserLogin = req.body;
 
-        // Find user
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        // Get user
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !user) {
             res.status(401).json({
                 success: false,
                 error: 'Invalid email or password',
@@ -214,27 +254,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        const user = result.rows[0];
-
-        // Check if user is banned
-        if (user.is_banned) {
-            res.status(403).json({
-                success: false,
-                error: 'Your account has been suspended. Please contact support.',
-            });
-            return;
-        }
-
-        // Check if email is verified
-        if (!user.is_verified) {
-            res.status(403).json({
-                success: false,
-                error: 'Please verify your email before logging in',
-            });
-            return;
-        }
-
-        // Verify password
+        // Check password
         const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
         if (!isPasswordValid) {
@@ -245,28 +265,45 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
+        // Check if email is verified
+        if (!user.is_verified) {
+            res.status(403).json({
+                success: false,
+                error: 'Please verify your email before logging in',
+                data: {
+                    email: user.email,
+                    requiresVerification: true,
+                },
+            });
+            return;
+        }
+
         // Update last login
-        await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+        await supabase
+            .from('users')
+            .update({ last_login: new Date().toISOString() })
+            .eq('id', user.id);
 
         // Generate JWT token
-        const token = generateToken({
-            userId: user.id,
-            email: user.email,
-            isAdmin: user.is_admin,
-        });
+        const token = generateToken({ userId: user.id, email: user.email, isAdmin: user.is_admin || false });
 
         res.status(200).json({
             success: true,
-            message: 'Login successful',
+            message: 'Login successful!',
             data: {
                 token,
                 user: {
                     id: user.id,
                     email: user.email,
                     name: user.name,
+                    phone: user.phone,
+                    department: user.department,
+                    year: user.year,
+                    hostel: user.hostel,
                     profile_picture: user.profile_picture,
-                    is_admin: user.is_admin,
                     trust_score: user.trust_score,
+                    is_admin: user.is_admin,
+                    created_at: user.created_at,
                 },
             },
         });
@@ -287,14 +324,13 @@ export const getCurrentUser = async (
     try {
         const userId = req.user?.userId;
 
-        const result = await pool.query(
-            `SELECT id, email, name, phone, department, year, hostel, profile_picture, 
-              trust_score, is_admin, created_at 
-       FROM users WHERE id = $1`,
-            [userId]
-        );
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('id, email, name, phone, department, year, hostel, profile_picture, trust_score, is_admin, is_verified, created_at')
+            .eq('id', userId)
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !user) {
             res.status(404).json({
                 success: false,
                 error: 'User not found',
@@ -304,13 +340,74 @@ export const getCurrentUser = async (
 
         res.status(200).json({
             success: true,
-            data: { user: result.rows[0] },
+            data: { user },
         });
     } catch (error) {
         console.error('Get current user error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to fetch user data',
+        });
+    }
+};
+
+// Update profile
+export const updateProfile = async (
+    req: AuthRequest,
+    res: Response
+): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        const { name, phone } = req.body;
+        const profilePicture = req.file;
+
+        let updateData: any = {};
+
+        if (name) updateData.name = name;
+        if (phone) updateData.phone = phone;
+
+        // Upload profile picture if provided
+        if (profilePicture) {
+            try {
+                const imageUrl = await uploadImage(profilePicture.buffer, 'thaparmarket/profiles');
+                updateData.profile_picture = imageUrl;
+            } catch (uploadError) {
+                console.error('Profile picture upload error:', uploadError);
+                res.status(500).json({
+                    success: false,
+                    error: 'Failed to upload profile picture',
+                });
+                return;
+            }
+        }
+
+        // Update user in database
+        const { data: updatedUser, error } = await supabase
+            .from('users')
+            .update(updateData)
+            .eq('id', userId)
+            .select('id, email, name, phone, profile_picture, trust_score, is_admin, created_at')
+            .single();
+
+        if (error) {
+            console.error('Update profile error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to update profile',
+            });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Profile updated successfully!',
+            data: { user: updatedUser },
+        });
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update profile',
         });
     }
 };
@@ -323,35 +420,48 @@ export const requestPasswordReset = async (
     try {
         const { email } = req.body;
 
-        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !user) {
             // Don't reveal if user exists
             res.status(200).json({
                 success: true,
-                message: 'If an account exists, a password reset link has been sent',
+                message: 'If an account exists with this email, you will receive a password reset link.',
             });
             return;
         }
 
-        const user = result.rows[0];
-
         // Generate reset token
-        const reset_token = generateVerificationToken(); // 6-digit code
+        const reset_token = generateVerificationToken();
         const reset_token_expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-        await pool.query(
-            `UPDATE users SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3`,
-            [reset_token, reset_token_expiry, user.id]
-        );
+        // Update user with reset token
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({
+                reset_token,
+                reset_token_expiry: reset_token_expiry.toISOString(),
+            })
+            .eq('id', user.id);
 
-        // Send reset email
-        const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${reset_token}&email=${email}`;
-        await sendPasswordResetEmail(user.email, user.name, resetLink);
+        if (updateError) {
+            console.error('Update error:', updateError);
+        }
+
+        // Send password reset email
+        try {
+            await sendPasswordResetEmail(user.email, user.name, reset_token);
+        } catch (emailError) {
+            console.error('Error sending password reset email:', emailError);
+        }
 
         res.status(200).json({
             success: true,
-            message: 'Password reset link sent to your email',
+            message: 'If an account exists with this email, you will receive a password reset link.',
         });
     } catch (error) {
         console.error('Password reset request error:', error);
@@ -367,12 +477,15 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
     try {
         const { email, token, newPassword } = req.body;
 
-        const result = await pool.query(
-            `SELECT * FROM users WHERE email = $1 AND reset_token = $2 AND reset_token_expiry > NOW()`,
-            [email, token]
-        );
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .eq('reset_token', token)
+            .gt('reset_token_expiry', new Date().toISOString())
+            .single();
 
-        if (result.rows.length === 0) {
+        if (error || !user) {
             res.status(400).json({
                 success: false,
                 error: 'Invalid or expired reset token',
@@ -380,21 +493,32 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        const user = result.rows[0];
-
         // Hash new password
         const saltRounds = 10;
         const password_hash = await bcrypt.hash(newPassword, saltRounds);
 
         // Update password and clear reset token
-        await pool.query(
-            `UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2`,
-            [password_hash, user.id]
-        );
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({
+                password_hash,
+                reset_token: null,
+                reset_token_expiry: null,
+            })
+            .eq('id', user.id);
+
+        if (updateError) {
+            console.error('Update error:', updateError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to reset password',
+            });
+            return;
+        }
 
         res.status(200).json({
             success: true,
-            message: 'Password reset successful. You can now login with your new password.',
+            message: 'Password reset successfully!',
         });
     } catch (error) {
         console.error('Password reset error:', error);

@@ -27,6 +27,7 @@ export default function ListingDetailPage() {
     const { user, isAuthenticated } = useAuthStore();
     const [listing, setListing] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -39,15 +40,22 @@ export default function ListingDetailPage() {
 
     const fetchListing = async (id: string) => {
         setIsLoading(true);
+        setError(null);
         try {
             const result = await listingService.getListingById(id);
             if (result.success) {
                 setListing(result.data.listing);
+            } else {
+                setError('Listing not found');
             }
         } catch (error: any) {
-            const errorMessage = handleApiError(error);
-            toast.error(errorMessage);
-            router.push('/');
+            // Check if it's a 404 error
+            if (error.response?.status === 404) {
+                setError('This listing does not exist or has been removed.');
+            } else {
+                const errorMessage = handleApiError(error);
+                setError(errorMessage || 'Failed to load listing');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -111,6 +119,53 @@ export default function ListingDetailPage() {
                 <div className="text-center">
                     <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-gray-600">Loading listing...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+                <div className="text-center max-w-md">
+                    <div className="mb-6">
+                        <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg
+                                className="w-12 h-12 text-red-600"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                />
+                            </svg>
+                        </div>
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2">Listing Not Found</h1>
+                        <p className="text-lg text-gray-600 mb-6">{error}</p>
+                        <p className="text-sm text-gray-500 mb-8">
+                            The listing you're looking for might have been removed, sold, or the link might be incorrect.
+                        </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <Button
+                            onClick={() => router.push('/')}
+                            className="flex items-center justify-center"
+                        >
+                            <ChevronLeft size={18} className="mr-2" />
+                            Back to Home
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => router.back()}
+                            className="flex items-center justify-center"
+                        >
+                            Go Back
+                        </Button>
+                    </div>
                 </div>
             </div>
         );
@@ -295,8 +350,13 @@ export default function ListingDetailPage() {
                                         <p className="font-semibold text-gray-900">
                                             {listing.seller_name}
                                         </p>
+                                        {listing.seller_email && (
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                                {listing.seller_email}
+                                            </p>
+                                        )}
                                         {listing.seller_trust_score && (
-                                            <div className="flex items-center text-sm text-gray-600">
+                                            <div className="flex items-center text-sm text-gray-600 mt-1">
                                                 <Star size={14} className="text-yellow-500 mr-1" />
                                                 {parseFloat(listing.seller_trust_score).toFixed(1)}
                                             </div>

@@ -5,11 +5,13 @@ import {
     resendVerificationOTP,
     login,
     getCurrentUser,
+    updateProfile,
     requestPasswordReset,
     resetPassword,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth';
 import { validate, registerSchema, loginSchema } from '../middleware/validation';
+import { upload } from '../middleware/upload';
 
 const router = express.Router();
 
@@ -23,5 +25,6 @@ router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.get('/me', authenticate, getCurrentUser);
+router.put('/profile', authenticate, upload.single('profile_picture'), updateProfile);
 
 export default router;

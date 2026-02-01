@@ -1,16 +1,38 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { Menu, X, User, LogOut, Package, MessageSquare, Shield } from 'lucide-react';
+import { messageService } from '@/services/messageService';
 
 export const Navbar: React.FC = () => {
     const router = useRouter();
     const { user, isAuthenticated, logout } = useAuthStore();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // Fetch unread count
+    useEffect(() => {
+        if (isAuthenticated) {
+            const fetchUnreadCount = async () => {
+                try {
+                    const result = await messageService.getUnreadCount();
+                    if (result.success) {
+                        setUnreadCount(result.data.unread_count || 0);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch unread count:', error);
+                }
+            };
+            fetchUnreadCount();
+            // Refresh every 30 seconds
+            const interval = setInterval(fetchUnreadCount, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [isAuthenticated]);
 
     const handleLogout = () => {
         logout();
@@ -34,7 +56,7 @@ export const Navbar: React.FC = () => {
                             <input
                                 type="text"
                                 placeholder="Search for items..."
-                                className="w-full pl-10 pr-4 py-2 border border-gray-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
                             />
                             <svg
                                 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -69,9 +91,14 @@ export const Navbar: React.FC = () => {
 
                                 <Link
                                     href="/messages"
-                                    className="text-gray-700 hover:text-blue-600 p-2 rounded-md transition-colors"
+                                    className="text-gray-700 hover:text-blue-600 p-2 rounded-md transition-colors relative"
                                 >
                                     <MessageSquare size={20} />
+                                    {unreadCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </span>
+                                    )}
                                 </Link>
 
                                 {/* User Menu */}
@@ -96,12 +123,16 @@ export const Navbar: React.FC = () => {
                                     {/* Dropdown */}
                                     {isUserMenuOpen && (
                                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 ring-1 ring-black ring-opacity-5">
-                                            <div className="px-4 py-2 border-b">
+                                            <Link
+                                                href="/profile"
+                                                className="block px-4 py-2 border-b hover:bg-gray-50 cursor-pointer transition-colors"
+                                                onClick={() => setIsUserMenuOpen(false)}
+                                            >
                                                 <p className="text-sm font-medium text-gray-900">
                                                     {user?.name}
                                                 </p>
                                                 <p className="text-xs text-gray-500">{user?.email}</p>
-                                            </div>
+                                            </Link>
 
                                             <Link
                                                 href="/my-listings"
@@ -110,15 +141,6 @@ export const Navbar: React.FC = () => {
                                             >
                                                 <Package size={16} className="mr-2" />
                                                 My Listings
-                                            </Link>
-
-                                            <Link
-                                                href={`/profile/${user?.id}`}
-                                                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                onClick={() => setIsUserMenuOpen(false)}
-                                            >
-                                                <User size={16} className="mr-2" />
-                                                Profile
                                             </Link>
 
                                             {user?.is_admin && (
@@ -208,7 +230,7 @@ export const Navbar: React.FC = () => {
                                     My Listings
                                 </Link>
                                 <Link
-                                    href={`/profile/${user?.id}`}
+                                    href="/profile"
                                     className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
                                 >
                                     Profile
