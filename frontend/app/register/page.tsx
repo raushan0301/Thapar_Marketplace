@@ -117,7 +117,7 @@ export default function RegisterPage() {
                         <Input
                             label="Full Name"
                             type="text"
-                            placeholder="John Doe"
+                            placeholder=""
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             error={errors.name}
@@ -199,7 +199,7 @@ export default function RegisterPage() {
                             <Input
                                 label="Department"
                                 type="text"
-                                placeholder="CSE"
+                                placeholder="COE"
                                 value={formData.department}
                                 onChange={(e) =>
                                     setFormData({ ...formData, department: e.target.value })
@@ -221,7 +221,7 @@ export default function RegisterPage() {
                             <Input
                                 label="Phone"
                                 type="tel"
-                                placeholder="9876543210"
+                                placeholder="+91 9999999999"
                                 value={formData.phone}
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                             />
@@ -229,7 +229,7 @@ export default function RegisterPage() {
                             <Input
                                 label="Hostel"
                                 type="text"
-                                placeholder="A"
+                                placeholder="Hostel O"
                                 value={formData.hostel}
                                 onChange={(e) => setFormData({ ...formData, hostel: e.target.value })}
                             />

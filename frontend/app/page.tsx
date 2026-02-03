@@ -8,7 +8,21 @@ import toast from 'react-hot-toast';
 import { handleApiError } from '@/lib/api';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
+import { useAuthStore } from '@/store/authStore';
+import { useRouter } from 'next/navigation';
+
 export default function HomePage() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuthStore();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
+
+
+
   const [listings, setListings] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,8 +43,12 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchCategories();
-    fetchListings();
   }, []);
+
+  // Fetch listings when filters or sorting changes
+  useEffect(() => {
+    fetchListings(1);
+  }, [filters.search, filters.category_id, filters.listing_type, filters.min_price, filters.max_price, filters.condition, sortBy]);
 
   const fetchCategories = async () => {
     try {
@@ -43,21 +61,21 @@ export default function HomePage() {
     }
   };
 
-  const fetchListings = async (page = 1, filterOverrides = {}) => {
+  const fetchListings = async (page = 1) => {
     setIsLoading(true);
     try {
-      const currentFilters = { ...filters, ...filterOverrides };
       const params: any = {
         page,
-        limit: 12,
+        limit: 15,
       };
 
-      if (currentFilters.search) params.search = currentFilters.search;
-      if (currentFilters.category_id) params.category_id = currentFilters.category_id;
-      if (currentFilters.listing_type) params.listing_type = currentFilters.listing_type;
-      if (currentFilters.min_price) params.min_price = currentFilters.min_price;
-      if (currentFilters.max_price) params.max_price = currentFilters.max_price;
-      if (currentFilters.condition) params.condition = currentFilters.condition;
+      // Apply all current filters
+      if (filters.search) params.search = filters.search;
+      if (filters.category_id) params.category_id = filters.category_id;
+      if (filters.listing_type) params.listing_type = filters.listing_type;
+      if (filters.min_price) params.min_price = filters.min_price;
+      if (filters.max_price) params.max_price = filters.max_price;
+      if (filters.condition) params.condition = filters.condition;
 
       // Add sorting
       if (sortBy === 'price-low') {
@@ -75,7 +93,11 @@ export default function HomePage() {
 
       if (result.success) {
         setListings(result.data.listings);
-        setPagination(result.data.pagination);
+        setPagination({
+          currentPage: result.data.pagination.page,
+          totalPages: result.data.pagination.totalPages,
+          totalListings: result.data.pagination.total,
+        });
       }
     } catch (error: any) {
       const errorMessage = handleApiError(error);
@@ -91,10 +113,7 @@ export default function HomePage() {
   };
 
   const handleFilterChange = (key: string, value: string) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-    // Immediately fetch with new filters (pass override to avoid async state issue)
-    fetchListings(1, { [key]: value });
+    setFilters({ ...filters, [key]: value });
   };
 
   const clearFilters = () => {
@@ -109,6 +128,9 @@ export default function HomePage() {
     fetchListings(1);
   };
 
+  // If not authenticated, don't render content (useEffect will redirect)
+  if (!isAuthenticated) return null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
@@ -117,34 +139,8 @@ export default function HomePage() {
         <div className="mb-6">
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             <button
-              onClick={async () => {
+              onClick={() => {
                 setFilters({ ...filters, category_id: '' });
-                setIsLoading(true);
-                setListings([]); // Clear listings immediately
-
-                const params: any = {
-                  page: 1,
-                  limit: 12,
-                };
-                if (filters.search) params.search = filters.search;
-                // Don't include category_id - we want all categories
-                if (filters.listing_type) params.listing_type = filters.listing_type;
-                if (filters.min_price) params.min_price = filters.min_price;
-                if (filters.max_price) params.max_price = filters.max_price;
-                if (filters.condition) params.condition = filters.condition;
-
-                try {
-                  const result = await listingService.getListings(params);
-                  if (result.success) {
-                    setListings(result.data.listings);
-                    setPagination(result.data.pagination);
-                  }
-                } catch (error: any) {
-                  const errorMessage = handleApiError(error);
-                  toast.error(errorMessage);
-                } finally {
-                  setIsLoading(false);
-                }
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filters.category_id === ''
                 ? 'bg-blue-600 text-white'
@@ -158,34 +154,8 @@ export default function HomePage() {
             {categories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={async () => {
+                onClick={() => {
                   setFilters({ ...filters, category_id: cat.id.toString() });
-                  setIsLoading(true);
-                  setListings([]); // Clear listings immediately
-
-                  const params: any = {
-                    page: 1,
-                    limit: 12,
-                    category_id: cat.id, // Use the category ID directly
-                  };
-                  if (filters.search) params.search = filters.search;
-                  if (filters.listing_type) params.listing_type = filters.listing_type;
-                  if (filters.min_price) params.min_price = filters.min_price;
-                  if (filters.max_price) params.max_price = filters.max_price;
-                  if (filters.condition) params.condition = filters.condition;
-
-                  try {
-                    const result = await listingService.getListings(params);
-                    if (result.success) {
-                      setListings(result.data.listings);
-                      setPagination(result.data.pagination);
-                    }
-                  } catch (error: any) {
-                    const errorMessage = handleApiError(error);
-                    toast.error(errorMessage);
-                  } finally {
-                    setIsLoading(false);
-                  }
                 }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${filters.category_id === cat.id.toString()
                   ? 'bg-blue-600 text-white'
@@ -208,7 +178,6 @@ export default function HomePage() {
             value={sortBy}
             onChange={(e) => {
               setSortBy(e.target.value);
-              fetchListings(1);
             }}
           >
             <option value="newest">Newest</option>
@@ -250,7 +219,7 @@ export default function HomePage() {
 
             {/* Pagination */}
             {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
+              <div className="flex items-center justify-center gap-2 mt-8 flex-wrap">
                 <Button
                   variant="ghost"
                   onClick={() => fetchListings(pagination.currentPage - 1)}
@@ -259,9 +228,35 @@ export default function HomePage() {
                   <ChevronLeft size={20} />
                 </Button>
 
-                <span className="text-sm text-gray-600">
-                  Page {pagination.currentPage} of {pagination.totalPages}
-                </span>
+                {/* Page Numbers */}
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => {
+                  // Show first page, last page, current page, and pages around current
+                  const showPage =
+                    pageNum === 1 ||
+                    pageNum === pagination.totalPages ||
+                    Math.abs(pageNum - pagination.currentPage) <= 1;
+
+                  if (!showPage) {
+                    // Show ellipsis
+                    if (pageNum === pagination.currentPage - 2 || pageNum === pagination.currentPage + 2) {
+                      return <span key={pageNum} className="text-gray-400">...</span>;
+                    }
+                    return null;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => fetchListings(pageNum)}
+                      className={`min-w-[40px] h-10 px-3 rounded-lg text-sm font-medium transition-colors ${pageNum === pagination.currentPage
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
 
                 <Button
                   variant="ghost"

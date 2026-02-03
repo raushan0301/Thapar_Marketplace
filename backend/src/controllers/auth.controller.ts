@@ -351,6 +351,41 @@ export const getCurrentUser = async (
     }
 };
 
+// Get public user profile
+export const getUserPublicProfile = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const { id } = req.params;
+
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('id, name, profile_picture, trust_score, created_at')
+            .eq('id', id)
+            .single();
+
+        if (error || !user) {
+            res.status(404).json({
+                success: false,
+                error: 'User not found',
+            });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            data: { user },
+        });
+    } catch (error) {
+        console.error('Get public profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch user profile',
+        });
+    }
+};
+
 // Update profile
 export const updateProfile = async (
     req: AuthRequest,
@@ -454,7 +489,9 @@ export const requestPasswordReset = async (
 
         // Send password reset email
         try {
-            await sendPasswordResetEmail(user.email, user.name, reset_token);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const resetLink = `${frontendUrl}/reset-password?token=${reset_token}&email=${encodeURIComponent(user.email)}`;
+            await sendPasswordResetEmail(user.email, user.name, resetLink);
         } catch (emailError) {
             console.error('Error sending password reset email:', emailError);
         }

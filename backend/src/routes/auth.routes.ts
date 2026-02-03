@@ -8,6 +8,7 @@ import {
     updateProfile,
     requestPasswordReset,
     resetPassword,
+    getUserPublicProfile,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth';
 import { validate, registerSchema, loginSchema } from '../middleware/validation';
@@ -25,6 +26,7 @@ router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.get('/me', authenticate, getCurrentUser);
+router.get('/users/:id', authenticate, getUserPublicProfile);
 router.put('/profile', authenticate, upload.single('profile_picture'), updateProfile);
 
 export default router;

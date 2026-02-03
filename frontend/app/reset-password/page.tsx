@@ -14,6 +14,7 @@ function ResetPasswordContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [token, setToken] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -21,9 +22,15 @@ function ResetPasswordContent() {
 
     useEffect(() => {
         const tokenFromUrl = searchParams.get('token');
+        const emailFromUrl = searchParams.get('email');
         if (tokenFromUrl) {
             setToken(tokenFromUrl);
-        } else {
+        }
+        if (emailFromUrl) {
+            setEmail(emailFromUrl);
+        }
+
+        if (!tokenFromUrl) {
             toast.error('Invalid reset link');
             router.push('/forgot-password');
         }
@@ -52,11 +59,15 @@ function ResetPasswordContent() {
         e.preventDefault();
 
         if (!validatePassword()) return;
+        if (!email) {
+            toast.error('Email is missing from the reset link');
+            return;
+        }
 
         setIsLoading(true);
 
         try {
-            const result = await authService.resetPassword(token, password);
+            const result = await authService.resetPassword(email, token, password);
 
             if (result.success) {
                 setResetSuccess(true);

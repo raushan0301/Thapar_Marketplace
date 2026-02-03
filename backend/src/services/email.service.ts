@@ -1,32 +1,32 @@
 import transporter from '../config/email';
 
 interface EmailOptions {
-    to: string;
-    subject: string;
-    html: string;
+  to: string;
+  subject: string;
+  html: string;
 }
 
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
-    try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_FROM || 'ThaparMarket <noreply@thaparmarket.com>',
-            to: options.to,
-            subject: options.subject,
-            html: options.html,
-        });
-        console.log(`✅ Email sent to ${options.to}`);
-    } catch (error) {
-        console.error('❌ Error sending email:', error);
-        throw new Error('Failed to send email');
-    }
+  try {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'ThaparMarket <noreply@thaparmarket.com>',
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+    });
+    console.log(`✅ Email sent to ${options.to}`);
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+    throw new Error('Failed to send email');
+  }
 };
 
 export const sendVerificationEmail = async (
-    email: string,
-    name: string,
-    token: string
+  email: string,
+  name: string,
+  token: string
 ): Promise<void> => {
-    const html = `
+  const html = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -52,7 +52,7 @@ export const sendVerificationEmail = async (
           <p>This OTP will expire in 15 minutes.</p>
           <p>If you didn't create an account, please ignore this email.</p>
           <div class="footer">
-            <p>Best regards,<br>ThaparMarket Team</p>
+            <p>Best regards,<br>SnapLocate Team</p>
             <p style="font-size: 12px; color: #9ca3af;">This is an automated email. Please do not reply.</p>
           </div>
         </div>
@@ -61,19 +61,19 @@ export const sendVerificationEmail = async (
     </html>
   `;
 
-    await sendEmail({
-        to: email,
-        subject: 'Verify Your ThaparMarket Account',
-        html,
-    });
+  await sendEmail({
+    to: email,
+    subject: 'Verify Your ThaparMarket Account',
+    html,
+  });
 };
 
 export const sendPasswordResetEmail = async (
-    email: string,
-    name: string,
-    resetLink: string
+  email: string,
+  name: string,
+  resetLink: string
 ): Promise<void> => {
-    const html = `
+  const html = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -101,7 +101,7 @@ export const sendPasswordResetEmail = async (
           <p>This link will expire in 1 hour.</p>
           <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
           <div class="footer">
-            <p>Best regards,<br>ThaparMarket Team</p>
+            <p>Best regards,<br>SnapLocate Team</p>
             <p style="font-size: 12px; color: #9ca3af;">This is an automated email. Please do not reply.</p>
           </div>
         </div>
@@ -110,15 +110,15 @@ export const sendPasswordResetEmail = async (
     </html>
   `;
 
-    await sendEmail({
-        to: email,
-        subject: 'Reset Your ThaparMarket Password',
-        html,
-    });
+  await sendEmail({
+    to: email,
+    subject: 'Reset Your ThaparMarket Password',
+    html,
+  });
 };
 
 export const sendWelcomeEmail = async (email: string, name: string): Promise<void> => {
-    const html = `
+  const html = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -144,10 +144,9 @@ export const sendWelcomeEmail = async (email: string, name: string): Promise<voi
           <div class="feature">🚲 Rent bikes and equipment from fellow students</div>
           <div class="feature">🔍 Report lost items or help others find theirs</div>
           <div class="feature">💬 Chat directly with buyers and sellers</div>
-          <div class="feature">⭐ Rate and review transactions</div>
           <p>Start exploring the marketplace and make your first listing today!</p>
           <div class="footer">
-            <p>Happy trading!<br>ThaparMarket Team</p>
+            <p>Happy Trading!<br>SnapLocate Team</p
           </div>
         </div>
       </div>
@@ -155,9 +154,9 @@ export const sendWelcomeEmail = async (email: string, name: string): Promise<voi
     </html>
   `;
 
-    await sendEmail({
-        to: email,
-        subject: 'Welcome to ThaparMarket! 🎉',
-        html,
-    });
+  await sendEmail({
+    to: email,
+    subject: 'Welcome to ThaparMarket! 🎉',
+    html,
+  });
 };

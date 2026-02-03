@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { messageService } from '@/services/messageService';
+import { authService } from '@/services/authService';
 import { useAuthStore } from '@/store/authStore';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +11,7 @@ import socketService from '@/lib/socket';
 import toast from 'react-hot-toast';
 import { handleApiError } from '@/lib/api';
 import { Send, MessageSquare, ArrowLeft } from 'lucide-react';
+import { eventBus } from '@/lib/eventBus';
 
 function MessagesContent() {
     const router = useRouter();
@@ -133,6 +135,9 @@ function MessagesContent() {
                         });
                         // Update messages state with read status
                         setMessages([...reversedMessages]);
+
+                        // Emit event to update navbar unread count
+                        eventBus.emit('unreadCountUpdated');
                     } catch (err) {
                         console.error('Failed to mark conversation as read:', err);
                     }
@@ -173,6 +178,24 @@ function MessagesContent() {
 
         setSelectedConversation(tempConversation);
         setMessages([]);
+
+        // Fetch user details to show real name immediately
+        try {
+            const result = await authService.getUserPublicDetails(otherUserId);
+            if (result.success) {
+                setSelectedConversation((prev: any) => prev ? ({
+                    ...prev,
+                    other_user_name: result.data.user.name,
+                    other_user_picture: result.data.user.profile_picture,
+                }) : null);
+            }
+        } catch (error) {
+            console.error('Failed to fetch user details:', error);
+            setSelectedConversation((prev: any) => prev ? ({
+                ...prev,
+                other_user_name: 'User',
+            }) : null);
+        }
 
         // Join chat room
         socketService.joinChat(`chat_${user?.id}_${otherUserId}`);

@@ -32,13 +32,18 @@ export default function ListingDetailPage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    const hasFetchedRef = React.useRef(false);
+
     useEffect(() => {
-        if (params.id) {
+        if (params.id && !hasFetchedRef.current) {
+            hasFetchedRef.current = true;
             fetchListing(params.id as string);
         }
     }, [params.id]);
 
     const fetchListing = async (id: string) => {
+        // Don't set loading true here to avoid flashing if we want to support strict mode better, 
+        // but for now keeping it simple.
         setIsLoading(true);
         setError(null);
         try {
@@ -88,15 +93,27 @@ export default function ListingDetailPage() {
     };
 
     const formatTimeAgo = (dateString: string) => {
+        if (!dateString) return '';
         const date = new Date(dateString);
         const now = new Date();
         const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
         if (seconds < 60) return 'Just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-        if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
-        return date.toLocaleDateString();
+
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes} minutes ago`;
+
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours} hours ago`;
+
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days} days ago`;
+
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
     };
 
     const nextImage = () => {
@@ -355,19 +372,14 @@ export default function ListingDetailPage() {
                                                 {listing.seller_email}
                                             </p>
                                         )}
-                                        {listing.seller_trust_score && (
-                                            <div className="flex items-center text-sm text-gray-600 mt-1">
-                                                <Star size={14} className="text-yellow-500 mr-1" />
-                                                {parseFloat(listing.seller_trust_score).toFixed(1)}
-                                            </div>
-                                        )}
+
                                     </div>
                                 </div>
                             </div>
 
                             {/* Action Buttons */}
                             {isOwner ? (
-                                <div className="space-y-3">
+                                <div className="flex flex-col gap-4">
                                     <Link href={`/listings/edit/${listing.id}`}>
                                         <Button className="w-full flex items-center justify-center">
                                             <Edit size={18} className="mr-2" />

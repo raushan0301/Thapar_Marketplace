@@ -154,13 +154,7 @@ export default function ProfilePage() {
                         <div className="flex justify-between items-start mb-6">
                             <div>
                                 <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
-                                <div className="flex items-center mt-2 text-gray-600">
-                                    <Star size={18} className="text-yellow-500 mr-1" />
-                                    <span className="font-medium">
-                                        {user.trust_score ? parseFloat(user.trust_score).toFixed(1) : '0.0'}
-                                    </span>
-                                    <span className="ml-1">Trust Score</span>
-                                </div>
+
                             </div>
                             <div className="flex gap-3">
                                 {isEditing || profilePicture ? (
@@ -241,10 +235,7 @@ export default function ProfilePage() {
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-500">User ID</p>
-                                        <p className="font-medium text-gray-900 font-mono text-xs">
-                                            {user.id}
-                                        </p>
+
                                     </div>
                                 </div>
                             </div>

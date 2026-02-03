@@ -46,6 +46,12 @@ export const authService = {
         return response.data;
     },
 
+    // Get public user details
+    getUserPublicDetails: async (userId: string) => {
+        const response = await api.get(`/auth/users/${userId}`);
+        return response.data;
+    },
+
     // Request password reset
     requestPasswordReset: async (email: string) => {
         const response = await api.post('/auth/forgot-password', { email });

@@ -170,12 +170,14 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
         // Apply sorting
         const ascending = sort_order === 'asc';
 
-        // If sorting by price, filter out items without price (lost/found items)
+        // If sorting by price, sort with nulls last
         if (sort_by === 'price') {
-            query = query.not('price', 'is', null);
+            query = query
+                .order('price', { ascending, nullsFirst: false })
+                .order('created_at', { ascending: false });
+        } else {
+            query = query.order(sort_by as string, { ascending });
         }
-
-        query = query.order(sort_by as string, { ascending });
 
         // Apply pagination
         query = query.range(offset, offset + limitNum - 1);
@@ -249,6 +251,17 @@ export const getListingById = async (req: AuthRequest, res: Response): Promise<v
             `)
             .eq('id', listingId)
             .single();
+
+        // Increment views (simple update)
+        if (listing) {
+            const newViews = (listing.views || 0) + 1;
+            supabase.from('listings')
+                .update({ views: newViews })
+                .eq('id', listingId)
+                .then(({ error }) => {
+                    if (error) console.error('Failed to increment views:', error);
+                });
+        }
 
 
         if (error || !listing) {
@@ -607,9 +620,20 @@ export const getCategories = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
+        let sortedCategories = categories || [];
+
+        // Custom sort to put 'Others' last
+        if (sortedCategories.length > 0) {
+            sortedCategories = sortedCategories.sort((a, b) => {
+                if (a.name === 'Others') return 1;
+                if (b.name === 'Others') return -1;
+                return a.name.localeCompare(b.name);
+            });
+        }
+
         res.status(200).json({
             success: true,
-            data: { categories: categories || [] },
+            data: { categories: sortedCategories },
         });
     } catch (error) {
         console.error('Get categories error:', error);

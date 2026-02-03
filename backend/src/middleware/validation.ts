@@ -25,8 +25,8 @@ export const registerSchema = Joi.object({
         'string.min': 'Name must be at least 2 characters long',
         'any.required': 'Name is required',
     }),
-    phone: Joi.string().pattern(/^[0-9]{10}$/).optional().messages({
-        'string.pattern.base': 'Phone number must be 10 digits',
+    phone: Joi.string().pattern(/^[0-9+\s-]{10,15}$/).optional().messages({
+        'string.pattern.base': 'Phone number must be valid (10-15 digits)',
     }),
     department: Joi.string().max(100).optional(),
     year: Joi.number().integer().min(1).max(5).optional(),
