@@ -41,11 +41,11 @@ api.interceptors.response.use(
 export default api;
 
 // Helper function to handle API errors
-export const handleApiError = (error: any): string => {
-    if (error.response?.data?.error) {
+export const handleApiError = (error: unknown): string => {
+    if (axios.isAxiosError(error) && error.response?.data?.error) {
         return error.response.data.error;
     }
-    if (error.message) {
+    if (error instanceof Error) {
         return error.message;
     }
     return 'An unexpected error occurred';

@@ -358,7 +358,7 @@ function MessagesContent() {
                     </div>
 
                     {/* Chat Window */}
-                    <div className={`${selectedConversation ? 'block' : 'hidden md:block'} flex-grow flex flex-col bg-white`}>
+                    <div className={`${selectedConversation ? 'block' : 'hidden md:block'} flex-grow flex flex-col bg-white h-full`}>
                         {selectedConversation ? (
                             <>
                                 {/* Chat Header */}
@@ -423,7 +423,7 @@ function MessagesContent() {
                                 </form>
                             </>
                         ) : (
-                            <div className="flex-grow flex items-center justify-center text-gray-400">
+                            <div className="flex-grow h-full flex flex-col items-center justify-center text-gray-400">
                                 <div className="text-center">
                                     <MessageSquare size={64} className="mx-auto mb-4" />
                                     <p className="text-lg">Select a conversation to start chatting</p>

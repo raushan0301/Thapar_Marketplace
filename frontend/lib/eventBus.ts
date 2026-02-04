@@ -1,4 +1,5 @@
 // Simple event emitter for cross-component communication
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type EventCallback = (...args: any[]) => void;
 
 class EventEmitter {
@@ -21,6 +22,7 @@ class EventEmitter {
         }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     emit(event: string, ...args: any[]) {
         const callbacks = this.events.get(event);
         if (callbacks) {

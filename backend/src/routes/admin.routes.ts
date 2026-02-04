@@ -9,6 +9,9 @@ import {
     createCategory,
     updateCategory,
     deleteCategory,
+    getAllMessages,
+    deleteMessage,
+    bulkDeleteMessages,
 } from '../controllers/admin.controller';
 import { authenticate } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
@@ -30,6 +33,11 @@ router.delete('/listings/:listingId', deleteListingAdmin);
 router.post('/categories', createCategory);
 router.put('/categories/:categoryId', updateCategory);
 router.delete('/categories/:categoryId', deleteCategory);
+
+// Message moderation
+router.get('/messages', getAllMessages);
+router.delete('/messages/:messageId', deleteMessage);
+router.delete('/messages/bulk', bulkDeleteMessages);
 
 // Analytics
 router.get('/analytics', getAnalytics);

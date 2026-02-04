@@ -58,6 +58,7 @@ class SocketService {
     }
 
     // Listen for new messages
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onNewMessage(callback: (data: any) => void): void {
         if (this.socket) {
             this.socket.on('new_message', callback);
@@ -72,7 +73,7 @@ class SocketService {
     }
 
     // Listen for typing indicator
-    onUserTyping(callback: (data: any) => void): void {
+    onUserTyping(callback: (data: { chatId: string; userId: string; isTyping: boolean }) => void): void {
         if (this.socket) {
             this.socket.on('user_typing', callback);
         }

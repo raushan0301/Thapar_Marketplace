@@ -318,7 +318,7 @@ export const getMyListings = async (req: AuthRequest, res: Response): Promise<vo
             .from('listings')
             .select(`
                 *,
-                categories!category_id (
+                categories:category_id (
                     id,
                     name,
                     icon

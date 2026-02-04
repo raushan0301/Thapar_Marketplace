@@ -104,13 +104,13 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* Quick Links */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                     <button
                         onClick={() => router.push('/admin/users')}
                         className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left"
                     >
                         <Users className="text-blue-600 mb-2" size={32} />
-                        <h3 className="font-semibold text-lg">User Management</h3>
+                        <h3 className="font-semibold text-lg text-gray-900">User Management</h3>
                         <p className="text-sm text-gray-600">Manage users and permissions</p>
                     </button>
 
@@ -119,8 +119,17 @@ export default function AdminDashboardPage() {
                         className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left"
                     >
                         <Package className="text-green-600 mb-2" size={32} />
-                        <h3 className="font-semibold text-lg">Listing Moderation</h3>
+                        <h3 className="font-semibold text-lg text-gray-900">Listing Moderation</h3>
                         <p className="text-sm text-gray-600">Review and moderate listings</p>
+                    </button>
+
+                    <button
+                        onClick={() => router.push('/admin/messages')}
+                        className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left"
+                    >
+                        <MessageSquare className="text-orange-600 mb-2" size={32} />
+                        <h3 className="font-semibold text-lg text-gray-900">Message Moderation</h3>
+                        <p className="text-sm text-gray-600">Monitor platform messages</p>
                     </button>
 
                     <button
@@ -128,7 +137,7 @@ export default function AdminDashboardPage() {
                         className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left"
                     >
                         <TrendingUp className="text-purple-600 mb-2" size={32} />
-                        <h3 className="font-semibold text-lg">Categories</h3>
+                        <h3 className="font-semibold text-lg text-gray-900">Categories</h3>
                         <p className="text-sm text-gray-600">Manage listing categories</p>
                     </button>
                 </div>
@@ -157,7 +166,7 @@ export default function AdminDashboardPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Recent Users */}
                     <div className="bg-white rounded-lg shadow-md p-6">
-                        <h3 className="text-lg font-semibold mb-4">Recent Users</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Users</h3>
                         <div className="space-y-3">
                             {analytics?.recentUsers?.slice(0, 5).map((user: any) => (
                                 <div key={user.id} className="flex items-center justify-between">
@@ -194,7 +203,7 @@ export default function AdminDashboardPage() {
 
                     {/* Recent Listings */}
                     <div className="bg-white rounded-lg shadow-md p-6">
-                        <h3 className="text-lg font-semibold mb-4">Recent Listings</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Listings</h3>
                         <div className="space-y-3">
                             {analytics?.recentListings?.slice(0, 5).map((listing: any) => (
                                 <div key={listing.id} className="flex items-center justify-between">
@@ -221,8 +230,8 @@ export default function AdminDashboardPage() {
                                     </div>
                                     <span
                                         className={`px-2 py-1 text-xs rounded-full ${listing.status === 'active'
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                            ? 'bg-green-100 text-green-800'
+                                            : 'bg-gray-100 text-gray-800'
                                             }`}
                                     >
                                         {listing.status}

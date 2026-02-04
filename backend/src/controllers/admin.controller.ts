@@ -2,6 +2,22 @@ import { Response } from 'express';
 import { supabase } from '../config/supabase';
 import { AuthRequest } from '../types';
 
+// Helper function to parse images field
+function parseImages(images: any): string[] {
+    if (!images) return [];
+    if (Array.isArray(images)) return images;
+    if (typeof images === 'string') {
+        try {
+            return JSON.parse(images);
+        } catch (e) {
+            // If it's a plain string (URL), wrap it in an array
+            return [images];
+        }
+    }
+    return [];
+}
+
+
 // Get all users (admin only)
 export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
@@ -79,14 +95,13 @@ export const getAllUsers = async (req: AuthRequest, res: Response): Promise<void
 // Ban/Unban user
 export const toggleUserBan = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { user_id } = req.params;
-        const { is_banned, ban_reason } = req.body;
+        const { userId } = req.params;
 
         // Check if user exists
         const { data: user, error: fetchError } = await supabase
             .from('users')
             .select('*')
-            .eq('id', user_id)
+            .eq('id', userId)
             .single();
 
         if (fetchError || !user) {
@@ -105,14 +120,16 @@ export const toggleUserBan = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
+        // Toggle ban status
+        const newBanStatus = !user.is_banned;
+
         // Update user
         const { data: updatedUser, error: updateError } = await supabase
             .from('users')
             .update({
-                is_banned,
-                ban_reason: is_banned ? ban_reason : null,
+                is_banned: newBanStatus,
             })
-            .eq('id', user_id)
+            .eq('id', userId)
             .select()
             .single();
 
@@ -127,7 +144,7 @@ export const toggleUserBan = async (req: AuthRequest, res: Response): Promise<vo
 
         res.status(200).json({
             success: true,
-            message: `User ${is_banned ? 'banned' : 'unbanned'} successfully`,
+            message: `User ${newBanStatus ? 'banned' : 'unbanned'} successfully`,
             data: { user: updatedUser },
         });
     } catch (error) {
@@ -143,6 +160,7 @@ export const toggleUserBan = async (req: AuthRequest, res: Response): Promise<vo
 export const getAllListingsAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const {
+            search,
             status,
             page = '1',
             limit = '20',
@@ -157,18 +175,23 @@ export const getAllListingsAdmin = async (req: AuthRequest, res: Response): Prom
             .from('listings')
             .select(`
                 *,
-                users!user_id (
+                users:user_id (
                     id,
                     name,
                     email,
                     profile_picture
                 ),
-                categories!category_id (
+                categories:category_id (
                     id,
                     name,
                     icon
                 )
             `, { count: 'exact' });
+
+        // Apply search filter
+        if (search) {
+            query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+        }
 
         // Apply filters
         if (status) {
@@ -191,10 +214,13 @@ export const getAllListingsAdmin = async (req: AuthRequest, res: Response): Prom
             return;
         }
 
-        // Parse images JSON for each listing
+        // Flatten user/category data for each listing
         const parsedListings = listings?.map(listing => ({
             ...listing,
-            images: listing.images ? JSON.parse(listing.images) : [],
+            images: parseImages(listing.images),
+            user_name: listing.users?.name || 'Unknown',
+            user_email: listing.users?.email || '',
+            category_name: listing.categories?.name || 'Unknown',
         })) || [];
 
         res.status(200).json({
@@ -221,13 +247,13 @@ export const getAllListingsAdmin = async (req: AuthRequest, res: Response): Prom
 // Delete listing (admin)
 export const deleteListingAdmin = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { listing_id } = req.params;
+        const { listingId } = req.params;
 
         // Check if listing exists
         const { data: listing, error: fetchError } = await supabase
             .from('listings')
             .select('*')
-            .eq('id', listing_id)
+            .eq('id', listingId)
             .single();
 
         if (fetchError || !listing) {
@@ -242,7 +268,7 @@ export const deleteListingAdmin = async (req: AuthRequest, res: Response): Promi
         const { error: deleteError } = await supabase
             .from('listings')
             .delete()
-            .eq('id', listing_id);
+            .eq('id', listingId);
 
         if (deleteError) {
             console.error('Delete listing admin error:', deleteError);
@@ -319,43 +345,62 @@ export const getAnalytics = async (req: AuthRequest, res: Response): Promise<voi
             .from('ratings')
             .select('*', { count: 'exact', head: true });
 
-        // Get listings by category
-        const { data: listingsByCategory } = await supabase
+        // Get average rating
+        const { data: ratingsData } = await supabase
+            .from('ratings')
+            .select('rating');
+
+        const averageRating = ratingsData && ratingsData.length > 0
+            ? ratingsData.reduce((sum, r) => sum + r.rating, 0) / ratingsData.length
+            : 0;
+
+        // Get recent users (last 10)
+        const { data: recentUsers } = await supabase
+            .from('users')
+            .select('id, name, email, profile_picture, is_banned, created_at')
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        // Get recent listings (last 10)
+        const { data: recentListings } = await supabase
             .from('listings')
             .select(`
-                category_id,
-                categories!category_id (
+                id,
+                title,
+                price,
+                rental_rate,
+                rental_period,
+                images,
+                status,
+                created_at,
+                categories:category_id (
                     name
                 )
-            `);
+            `)
+            .order('created_at', { ascending: false })
+            .limit(10);
 
-        const categoryStats = listingsByCategory?.reduce((acc: any, listing: any) => {
-            const categoryName = listing.categories?.name || 'Unknown';
-            acc[categoryName] = (acc[categoryName] || 0) + 1;
-            return acc;
-        }, {});
+        // Format recent listings
+        const parsedRecentListings = recentListings?.map(listing => ({
+            ...listing,
+            images: parseImages(listing.images),
+        })) || [];
 
         res.status(200).json({
             success: true,
             data: {
-                users: {
-                    total: totalUsers || 0,
-                    verified: verifiedUsers || 0,
-                    banned: bannedUsers || 0,
-                },
-                listings: {
-                    total: totalListings || 0,
-                    active: activeListings || 0,
-                    sold: soldListings || 0,
-                    rented: rentedListings || 0,
-                    by_category: categoryStats || {},
-                },
-                messages: {
-                    total: totalMessages || 0,
-                },
-                ratings: {
-                    total: totalRatings || 0,
-                },
+                totalUsers: totalUsers || 0,
+                verifiedUsers: verifiedUsers || 0,
+                bannedUsers: bannedUsers || 0,
+                totalListings: totalListings || 0,
+                activeListings: activeListings || 0,
+                soldListings: soldListings || 0,
+                rentedListings: rentedListings || 0,
+                totalMessages: totalMessages || 0,
+                totalRatings: totalRatings || 0,
+                averageRating: averageRating.toFixed(2),
+                recentUsers: recentUsers || [],
+                recentListings: parsedRecentListings,
             },
         });
     } catch (error) {
@@ -422,12 +467,12 @@ export const getAdminLogs = async (req: AuthRequest, res: Response): Promise<voi
 // Create category
 export const createCategory = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { name, icon } = req.body;
+        const { name, type, icon, description } = req.body;
 
-        if (!name) {
+        if (!name || !type) {
             res.status(400).json({
                 success: false,
-                error: 'Category name is required',
+                error: 'Category name and type are required',
             });
             return;
         }
@@ -437,7 +482,9 @@ export const createCategory = async (req: AuthRequest, res: Response): Promise<v
             .from('categories')
             .insert({
                 name,
+                type,
                 icon: icon || null,
+                description: description || null,
             })
             .select()
             .single();
@@ -468,14 +515,14 @@ export const createCategory = async (req: AuthRequest, res: Response): Promise<v
 // Update category
 export const updateCategory = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { category_id } = req.params;
-        const { name, icon } = req.body;
+        const { categoryId } = req.params;
+        const { name, type, icon, description } = req.body;
 
         // Check if category exists
         const { data: category, error: fetchError } = await supabase
             .from('categories')
             .select('*')
-            .eq('id', category_id)
+            .eq('id', categoryId)
             .single();
 
         if (fetchError || !category) {
@@ -491,9 +538,11 @@ export const updateCategory = async (req: AuthRequest, res: Response): Promise<v
             .from('categories')
             .update({
                 name: name || category.name,
+                type: type || category.type,
                 icon: icon !== undefined ? icon : category.icon,
+                description: description !== undefined ? description : category.description,
             })
-            .eq('id', category_id)
+            .eq('id', categoryId)
             .select()
             .single();
 
@@ -523,13 +572,13 @@ export const updateCategory = async (req: AuthRequest, res: Response): Promise<v
 // Delete category
 export const deleteCategory = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { category_id } = req.params;
+        const { categoryId } = req.params;
 
         // Check if category has listings
         const { count } = await supabase
             .from('listings')
             .select('*', { count: 'exact', head: true })
-            .eq('category_id', category_id);
+            .eq('category_id', categoryId);
 
         if (count && count > 0) {
             res.status(400).json({
@@ -543,7 +592,7 @@ export const deleteCategory = async (req: AuthRequest, res: Response): Promise<v
         const { error } = await supabase
             .from('categories')
             .delete()
-            .eq('id', category_id);
+            .eq('id', categoryId);
 
         if (error) {
             console.error('Delete category error:', error);
@@ -563,6 +612,191 @@ export const deleteCategory = async (req: AuthRequest, res: Response): Promise<v
         res.status(500).json({
             success: false,
             error: 'Failed to delete category',
+        });
+    }
+};
+
+// Get all messages (admin)
+export const getAllMessages = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const {
+            search,
+            type,
+            page = '1',
+            limit = '50',
+        } = req.query;
+
+        const pageNum = parseInt(page as string);
+        const limitNum = parseInt(limit as string);
+        const offset = (pageNum - 1) * limitNum;
+
+        // Build query
+        let query = supabase
+            .from('messages')
+            .select(`
+                *,
+                sender:users!sender_id (
+                    id,
+                    name,
+                    email,
+                    profile_picture
+                ),
+                receiver:users!receiver_id (
+                    id,
+                    name,
+                    email,
+                    profile_picture
+                ),
+                listing:listings!listing_id (
+                    id,
+                    title
+                )
+            `, { count: 'exact' });
+
+        // Apply search filter
+        if (search) {
+            query = query.or(`message.ilike.%${search}%`);
+        }
+
+        // Apply type filter
+        if (type === 'with_image') {
+            query = query.not('image_url', 'is', null);
+        } else if (type === 'unread') {
+            query = query.eq('is_read', false);
+        }
+
+        // Apply sorting and pagination
+        query = query
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limitNum - 1);
+
+        const { data: messages, error, count } = await query;
+
+        if (error) {
+            console.error('Get all messages admin error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to fetch messages',
+            });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                messages: messages || [],
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total: count || 0,
+                    totalPages: Math.ceil((count || 0) / limitNum),
+                },
+            },
+        });
+    } catch (error) {
+        console.error('Get all messages admin error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch messages',
+        });
+    }
+};
+
+// Delete message (admin)
+export const deleteMessage = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { messageId } = req.params;
+
+        // Check if message exists
+        const { data: message, error: fetchError } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('id', messageId)
+            .single();
+
+        if (fetchError || !message) {
+            res.status(404).json({
+                success: false,
+                error: 'Message not found',
+            });
+            return;
+        }
+
+        // Delete message
+        const { error: deleteError } = await supabase
+            .from('messages')
+            .delete()
+            .eq('id', messageId);
+
+        if (deleteError) {
+            console.error('Delete message admin error:', deleteError);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete message',
+            });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Message deleted successfully',
+        });
+    } catch (error) {
+        console.error('Delete message admin error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete message',
+        });
+    }
+};
+
+// Bulk delete messages (admin)
+export const bulkDeleteMessages = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { userId, type } = req.body;
+
+        if (!userId || !type) {
+            res.status(400).json({
+                success: false,
+                error: 'User ID and type are required',
+            });
+            return;
+        }
+
+        if (!['sender', 'receiver'].includes(type)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid type. Must be "sender" or "receiver"',
+            });
+            return;
+        }
+
+        // Delete messages
+        const column = type === 'sender' ? 'sender_id' : 'receiver_id';
+        const { error, count } = await supabase
+            .from('messages')
+            .delete({ count: 'exact' })
+            .eq(column, userId);
+
+        if (error) {
+            console.error('Bulk delete messages error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to delete messages',
+            });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Successfully deleted ${count || 0} messages`,
+            data: { deletedCount: count || 0 },
+        });
+    } catch (error) {
+        console.error('Bulk delete messages error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete messages',
         });
     }
 };
