@@ -24,21 +24,43 @@ const app = express();
 const httpServer = createServer(app);
 
 // Initialize Socket.IO
+// CORS Configuration
+const getOrigin = () => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    if (frontendUrl === '*') return true;
+
+    const origins = frontendUrl.split(',').map(url => url.trim());
+    return (origin: string | undefined, callback: (err: Error | null, origin?: boolean | string | RegExp | (string | RegExp)[]) => void) => {
+        if (!origin || origins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.warn(`Blocked CORS request from origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    };
+};
+
+// Initialize Socket.IO
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.FRONTEND_URL === '*'
-            ? true
-            : process.env.FRONTEND_URL,
+        origin: (origin, callback) => {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            if (frontendUrl === '*') return callback(null, true);
+
+            const origins = frontendUrl.split(',').map(url => url.trim());
+            if (!origin || origins.includes(origin)) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'), false);
+            }
+        },
         credentials: true,
     },
 });
 
-
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL === '*'
-        ? true
-        : process.env.FRONTEND_URL,
+    origin: getOrigin(),
     credentials: true,
 }));
 
