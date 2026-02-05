@@ -1,4 +1,4 @@
-import transporter from '../config/email';
+import resend from '../config/email';
 
 interface EmailOptions {
   to: string;
@@ -8,12 +8,18 @@ interface EmailOptions {
 
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || 'ThaparMarket <noreply@thaparmarket.com>',
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM || 'ThaparMarket <onboarding@resend.dev>',
       to: options.to,
       subject: options.subject,
       html: options.html,
     });
+
+    if (error) {
+      console.error('❌ Error sending email:', error);
+      throw new Error(error.message);
+    }
+
     console.log(`✅ Email sent to ${options.to}`);
   } catch (error) {
     console.error('❌ Error sending email:', error);
