@@ -137,8 +137,23 @@ export const verifyEmail = async (req: Request, res: Response): Promise<void> =>
         // Send welcome email
         try {
             await sendWelcomeEmail(user.email, user.name);
-        } catch (emailError) {
+        } catch (emailError: any) {
             console.error('Error sending welcome email:', emailError);
+            // Don't block verification, but inform frontend
+            res.status(200).json({
+                success: true,
+                message: 'Email verified successfully! (Welcome email failed to send: ' + emailError.message + ')',
+                data: {
+                    token: generateToken({ userId: user.id, email: user.email, isAdmin: user.is_admin || false }),
+                    user: {
+                        id: user.id,
+                        email: user.email,
+                        name: user.name,
+                        is_verified: true,
+                    },
+                },
+            });
+            return;
         }
 
         // Generate JWT token
@@ -489,7 +504,11 @@ export const requestPasswordReset = async (
 
         // Send password reset email
         try {
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const rawFrontendUrls = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const frontendUrls = rawFrontendUrls.split(',').map(url => url.trim());
+            // Prefer non-localhost URL for emails, otherwise use the first one
+            const frontendUrl = frontendUrls.find(url => !url.includes('localhost')) || frontendUrls[0];
+
             const resetLink = `${frontendUrl}/reset-password?token=${reset_token}&email=${encodeURIComponent(user.email)}`;
             await sendPasswordResetEmail(user.email, user.name, resetLink);
         } catch (emailError) {

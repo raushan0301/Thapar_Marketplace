@@ -81,8 +81,8 @@ export const validate = (schema: Joi.ObjectSchema) => {
             const errors = error.details.map((detail) => detail.message);
             res.status(400).json({
                 success: false,
-                error: 'Validation error',
-                details: errors,
+                error: errors[0], // Show the first error message directly
+                validationErrors: errors, // Keep full details if needed
             });
             return;
         }

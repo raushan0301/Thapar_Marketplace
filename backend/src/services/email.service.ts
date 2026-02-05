@@ -152,7 +152,7 @@ export const sendWelcomeEmail = async (email: string, name: string): Promise<voi
           <div class="feature">💬 Chat directly with buyers and sellers</div>
           <p>Start exploring the marketplace and make your first listing today!</p>
           <div class="footer">
-            <p>Happy Trading!<br>SnapLocate Team</p
+            <p>Happy Trading!<br>SnapLocate Team</p>
           </div>
         </div>
       </div>
