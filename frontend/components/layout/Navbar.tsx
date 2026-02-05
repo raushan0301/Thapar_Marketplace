@@ -240,6 +240,7 @@ export const Navbar: React.FC = () => {
                             <Link
                                 href="/"
                                 className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 Browse
                             </Link>
@@ -250,24 +251,28 @@ export const Navbar: React.FC = () => {
                                 <Link
                                     href="/listings/create"
                                     className="block px-3 py-2 rounded-md text-base font-medium text-blue-600 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     + Sell Item
                                 </Link>
                                 <Link
                                     href="/messages"
                                     className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     Messages
                                 </Link>
                                 <Link
                                     href="/my-listings"
                                     className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     My Listings
                                 </Link>
                                 <Link
                                     href="/profile"
                                     className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     Profile
                                 </Link>
@@ -275,12 +280,16 @@ export const Navbar: React.FC = () => {
                                     <Link
                                         href="/admin"
                                         className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                        onClick={() => setIsMobileMenuOpen(false)}
                                     >
                                         Admin Panel
                                     </Link>
                                 )}
                                 <button
-                                    onClick={handleLogout}
+                                    onClick={() => {
+                                        setIsMobileMenuOpen(false);
+                                        handleLogout();
+                                    }}
                                     className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:bg-gray-100"
                                 >
                                     Logout
@@ -291,12 +300,14 @@ export const Navbar: React.FC = () => {
                                 <Link
                                     href="/login"
                                     className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     Login
                                 </Link>
                                 <Link
                                     href="/register"
                                     className="block px-3 py-2 rounded-md text-base font-medium text-blue-600 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     Sign Up
                                 </Link>
