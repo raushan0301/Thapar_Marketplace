@@ -12,6 +12,7 @@ import listingRoutes from './routes/listing.routes';
 import messageRoutes from './routes/message.routes';
 import ratingRoutes from './routes/rating.routes';
 import adminRoutes from './routes/admin.routes';
+import lostFoundRoutes from './routes/lostfound.routes';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -90,6 +91,7 @@ app.use('/api/listings', listingRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/lost-found', lostFoundRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {

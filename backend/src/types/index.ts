@@ -56,6 +56,8 @@ export interface Listing {
     status: 'active' | 'sold' | 'rented' | 'expired' | 'deleted' | 'pending';
     views: number;
     is_featured: boolean;
+    reward?: string; // For lost items - reward offered
+    incident_date?: Date; // When item was lost/found
     expires_at?: Date;
     created_at: Date;
     updated_at: Date;
@@ -71,6 +73,8 @@ export interface CreateListing {
     condition?: string;
     location?: string;
     listing_type: 'sell' | 'rent' | 'lost' | 'found';
+    reward?: string;
+    incident_date?: string;
 }
 
 // Category types

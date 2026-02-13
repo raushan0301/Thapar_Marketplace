@@ -106,12 +106,20 @@ export const Navbar: React.FC = () => {
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center space-x-4 flex-shrink-0">
                         {isAuthenticated && (
-                            <Link
-                                href="/"
-                                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                            >
-                                Browse
-                            </Link>
+                            <>
+                                <Link
+                                    href="/"
+                                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                                >
+                                    Browse
+                                </Link>
+                                <Link
+                                    href="/lost-found"
+                                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1"
+                                >
+                                    Lost & Found
+                                </Link>
+                            </>
                         )}
 
                         {isAuthenticated ? (
@@ -237,13 +245,22 @@ export const Navbar: React.FC = () => {
                 <div className="md:hidden border-t">
                     <div className="px-2 pt-2 pb-3 space-y-1">
                         {isAuthenticated && (
-                            <Link
-                                href="/"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
-                                onClick={() => setIsMobileMenuOpen(false)}
-                            >
-                                Browse
-                            </Link>
+                            <>
+                                <Link
+                                    href="/"
+                                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Browse
+                                </Link>
+                                <Link
+                                    href="/lost-found"
+                                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    Lost & Found
+                                </Link>
+                            </>
                         )}
 
                         {isAuthenticated ? (

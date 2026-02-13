@@ -11,23 +11,20 @@ function parseImages(images: any): string[] {
         try {
             return JSON.parse(images);
         } catch (e) {
-            // If it's a plain string (URL), wrap it in an array
             return [images];
         }
     }
     return [];
 }
 
-// Create new listing
-export const createListing = async (req: AuthRequest, res: Response): Promise<void> => {
+// Create Lost or Found item
+export const createLostFoundItem = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
         const {
             title,
             description,
-            price,
             category_id,
-            condition,
             listing_type,
             location,
             reward,
@@ -43,12 +40,21 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
+        // Validate listing_type is lost or found
+        if (!['lost', 'found'].includes(listing_type)) {
+            res.status(400).json({
+                success: false,
+                error: 'Invalid listing type. Must be "lost" or "found"',
+            });
+            return;
+        }
+
         // Upload images if provided
         let imageUrls: string[] = [];
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
             try {
                 console.log(`📸 Uploading ${req.files.length} images...`);
-                imageUrls = await uploadMultipleImages(req.files, 'thaparmarket/listings');
+                imageUrls = await uploadMultipleImages(req.files, 'thaparmarket/lostfound');
                 console.log(`✅ Images uploaded successfully: ${imageUrls.length} images`);
             } catch (uploadError) {
                 console.error('Image upload error:', uploadError);
@@ -60,7 +66,7 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
             }
         }
 
-        console.log('💾 Inserting listing into database...');
+        console.log('💾 Inserting lost/found item into database...');
 
         // Insert listing
         const { data: listing, error } = await supabase
@@ -69,9 +75,7 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
                 user_id: userId,
                 title,
                 description,
-                price: price || null,
                 category_id,
-                condition: condition || null,
                 listing_type,
                 location: location || null,
                 reward: reward || null,
@@ -86,38 +90,36 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
             console.error('Database error:', error);
             res.status(500).json({
                 success: false,
-                error: 'Failed to create listing',
+                error: 'Failed to create lost/found item',
             });
             return;
         }
 
-        console.log('✅ Listing created successfully!');
+        console.log('✅ Lost/Found item created successfully!');
 
         res.status(201).json({
             success: true,
-            message: 'Listing created successfully',
+            message: `${listing_type === 'lost' ? 'Lost' : 'Found'} item posted successfully`,
             data: { listing },
         });
     } catch (error) {
-        console.error('Create listing error:', error);
+        console.error('Create lost/found item error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to create listing',
+            error: 'Failed to create lost/found item',
         });
     }
 };
 
-// Get all listings with filters
-export const getAllListings = async (req: AuthRequest, res: Response): Promise<void> => {
+// Get all Lost & Found items with filters
+export const getLostFoundItems = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const {
             category_id,
-            listing_type,
-            condition,
-            min_price,
-            max_price,
+            listing_type, // 'lost' or 'found'
+            location,
             search,
-            sort_by = 'created_at',
+            sort_by = 'incident_date',
             sort_order = 'desc',
             page = '1',
             limit = '20',
@@ -127,7 +129,7 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
         const limitNum = parseInt(limit as string);
         const offset = (pageNum - 1) * limitNum;
 
-        // Build query
+        // Build query - only get lost and found items
         let query = supabase
             .from('listings')
             .select(`
@@ -136,7 +138,8 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
                     id,
                     name,
                     profile_picture,
-                    trust_score
+                    trust_score,
+                    phone
                 ),
                 categories:category_id (
                     id,
@@ -144,6 +147,7 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
                     icon
                 )
             `, { count: 'exact' })
+            .in('listing_type', ['lost', 'found'])
             .eq('status', 'active');
 
         // Apply filters
@@ -151,20 +155,12 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
             query = query.eq('category_id', category_id);
         }
 
-        if (listing_type) {
+        if (listing_type && ['lost', 'found'].includes(listing_type as string)) {
             query = query.eq('listing_type', listing_type);
         }
 
-        if (condition) {
-            query = query.eq('condition', condition);
-        }
-
-        if (min_price) {
-            query = query.gte('price', parseFloat(min_price as string));
-        }
-
-        if (max_price) {
-            query = query.lte('price', parseFloat(max_price as string));
+        if (location) {
+            query = query.ilike('location', `%${location}%`);
         }
 
         if (search) {
@@ -174,10 +170,9 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
         // Apply sorting
         const ascending = sort_order === 'asc';
 
-        // If sorting by price, sort with nulls last
-        if (sort_by === 'price') {
+        if (sort_by === 'incident_date') {
             query = query
-                .order('price', { ascending, nullsFirst: false })
+                .order('incident_date', { ascending, nullsFirst: false })
                 .order('created_at', { ascending: false });
         } else {
             query = query.order(sort_by as string, { ascending });
@@ -189,21 +184,22 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
         const { data: listings, error, count } = await query;
 
         if (error) {
-            console.error('Get listings error:', error);
+            console.error('Get lost/found items error:', error);
             res.status(500).json({
                 success: false,
-                error: 'Failed to fetch listings',
+                error: 'Failed to fetch lost/found items',
             });
             return;
         }
 
-        // Parse images and flatten seller info for each listing
+        // Parse images and flatten user info for each listing
         const parsedListings = listings?.map(listing => ({
             ...listing,
             images: parseImages(listing.images),
-            seller_name: listing.users?.name,
-            seller_profile_picture: listing.users?.profile_picture,
-            seller_trust_score: listing.users?.trust_score,
+            poster_name: listing.users?.name,
+            poster_profile_picture: listing.users?.profile_picture,
+            poster_trust_score: listing.users?.trust_score,
+            poster_phone: listing.users?.phone,
             category_name: listing.categories?.name,
             category_icon: listing.categories?.icon,
         })) || [];
@@ -211,7 +207,7 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
         res.status(200).json({
             success: true,
             data: {
-                listings: parsedListings,
+                items: parsedListings,
                 pagination: {
                     page: pageNum,
                     limit: limitNum,
@@ -221,18 +217,18 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
             },
         });
     } catch (error) {
-        console.error('Get listings error:', error);
+        console.error('Get lost/found items error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to fetch listings',
+            error: 'Failed to fetch lost/found items',
         });
     }
 };
 
-// Get listing by ID
-export const getListingById = async (req: AuthRequest, res: Response): Promise<void> => {
+// Get Lost & Found item by ID
+export const getLostFoundItemById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { listingId } = req.params;
+        const { itemId } = req.params;
 
         const { data: listing, error } = await supabase
             .from('listings')
@@ -253,159 +249,84 @@ export const getListingById = async (req: AuthRequest, res: Response): Promise<v
                     icon
                 )
             `)
-            .eq('id', listingId)
+            .eq('id', itemId)
+            .in('listing_type', ['lost', 'found'])
             .single();
 
-        // Increment views (simple update)
+        // Increment views
         if (listing) {
             const newViews = (listing.views || 0) + 1;
             supabase.from('listings')
                 .update({ views: newViews })
-                .eq('id', listingId)
+                .eq('id', itemId)
                 .then(({ error }) => {
                     if (error) console.error('Failed to increment views:', error);
                 });
         }
 
-
         if (error || !listing) {
             console.error('Supabase error:', error);
-            console.error('Listing data:', listing);
             res.status(404).json({
                 success: false,
-                error: 'Listing not found',
+                error: 'Lost/Found item not found',
             });
             return;
         }
 
-        // Parse images and flatten seller info
+        // Parse images and flatten user info
         const parsedListing = {
             ...listing,
             images: parseImages(listing.images),
-            seller_name: listing.users?.name,
-            seller_email: listing.users?.email,
-            seller_phone: listing.users?.phone,
-            seller_profile_picture: listing.users?.profile_picture,
-            seller_trust_score: listing.users?.trust_score,
+            poster_name: listing.users?.name,
+            poster_email: listing.users?.email,
+            poster_phone: listing.users?.phone,
+            poster_profile_picture: listing.users?.profile_picture,
+            poster_trust_score: listing.users?.trust_score,
             category_name: listing.categories?.name,
             category_icon: listing.categories?.icon,
         };
 
         res.status(200).json({
             success: true,
-            data: { listing: parsedListing },
+            data: { item: parsedListing },
         });
     } catch (error) {
-        console.error('Get listing error:', error);
+        console.error('Get lost/found item error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to fetch listing',
+            error: 'Failed to fetch lost/found item',
         });
     }
 };
 
-// Get user's own listings
-export const getMyListings = async (req: AuthRequest, res: Response): Promise<void> => {
+// Update Lost/Found item
+export const updateLostFoundItem = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const {
-            status,
-            page = '1',
-            limit = '20',
-        } = req.query;
-
-        const pageNum = parseInt(page as string);
-        const limitNum = parseInt(limit as string);
-        const offset = (pageNum - 1) * limitNum;
-
-        let query = supabase
-            .from('listings')
-            .select(`
-                *,
-                categories:category_id (
-                    id,
-                    name,
-                    icon
-                )
-            `, { count: 'exact' })
-            .eq('user_id', userId);
-
-        if (status) {
-            query = query.eq('status', status);
-        }
-
-        query = query
-            .order('created_at', { ascending: false })
-            .range(offset, offset + limitNum - 1);
-
-        const { data: listings, error, count } = await query;
-
-        if (error) {
-            console.error('Get my listings error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Failed to fetch listings',
-            });
-            return;
-        }
-
-        // Parse images and flatten category info for each listing
-        const parsedListings = listings?.map(listing => ({
-            ...listing,
-            images: parseImages(listing.images),
-            category_name: listing.categories?.name,
-            category_icon: listing.categories?.icon,
-        })) || [];
-
-        res.status(200).json({
-            success: true,
-            data: {
-                listings: parsedListings,
-                pagination: {
-                    page: pageNum,
-                    limit: limitNum,
-                    total: count || 0,
-                    totalPages: Math.ceil((count || 0) / limitNum),
-                },
-            },
-        });
-    } catch (error) {
-        console.error('Get my listings error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch listings',
-        });
-    }
-};
-
-// Update listing
-export const updateListing = async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-        const userId = req.user?.userId;
-        const { listingId } = req.params;
+        const { itemId } = req.params;
         const {
             title,
             description,
-            price,
             category_id,
-            condition,
-            listing_type,
             location,
+            reward,
+            incident_date,
             existing_images,
         } = req.body;
 
-        // Check if listing exists and belongs to user
+        // Check if item exists and belongs to user
         const { data: existingListing, error: fetchError } = await supabase
             .from('listings')
             .select('*')
-            .eq('id', listingId)
+            .eq('id', itemId)
             .eq('user_id', userId)
+            .in('listing_type', ['lost', 'found'])
             .single();
 
         if (fetchError || !existingListing) {
             res.status(404).json({
                 success: false,
-                error: 'Listing not found or you do not have permission to edit it',
+                error: 'Lost/Found item not found or you do not have permission to edit it',
             });
             return;
         }
@@ -413,7 +334,6 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
         // Handle images
         let imageUrls: string[] = [];
 
-        // Keep existing images that weren't removed
         if (existing_images) {
             imageUrls = Array.isArray(existing_images) ? existing_images : JSON.parse(existing_images);
         }
@@ -421,7 +341,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
         // Upload new images if provided
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
             try {
-                const newImageUrls = await uploadMultipleImages(req.files, 'thaparmarket/listings');
+                const newImageUrls = await uploadMultipleImages(req.files, 'thaparmarket/lostfound');
                 imageUrls = [...imageUrls, ...newImageUrls];
             } catch (uploadError) {
                 console.error('Image upload error:', uploadError);
@@ -434,7 +354,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
         }
 
         // Delete removed images from Cloudinary
-        const oldImages = existingListing.images ? JSON.parse(existingListing.images) : [];
+        const oldImages = existingListing.images ? parseImages(existingListing.images) : [];
         const removedImages = oldImages.filter((img: string) => !imageUrls.includes(img));
         if (removedImages.length > 0) {
             try {
@@ -444,21 +364,20 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             }
         }
 
-        // Update listing
+        // Update item
         const { data: updatedListing, error: updateError } = await supabase
             .from('listings')
             .update({
                 title: title || existingListing.title,
                 description: description || existingListing.description,
-                price: price !== undefined ? price : existingListing.price,
                 category_id: category_id || existingListing.category_id,
-                condition: condition || existingListing.condition,
-                listing_type: listing_type || existingListing.listing_type,
-                location: location || existingListing.location,
+                location: location !== undefined ? location : existingListing.location,
+                reward: reward !== undefined ? reward : existingListing.reward,
+                incident_date: incident_date !== undefined ? incident_date : existingListing.incident_date,
                 images: imageUrls.length > 0 ? imageUrls : null,
                 updated_at: new Date().toISOString(),
             })
-            .eq('id', listingId)
+            .eq('id', itemId)
             .select()
             .single();
 
@@ -466,121 +385,53 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             console.error('Update error:', updateError);
             res.status(500).json({
                 success: false,
-                error: 'Failed to update listing',
+                error: 'Failed to update lost/found item',
             });
             return;
         }
 
         res.status(200).json({
             success: true,
-            message: 'Listing updated successfully',
-            data: { listing: updatedListing },
+            message: 'Lost/Found item updated successfully',
+            data: { item: updatedListing },
         });
     } catch (error) {
-        console.error('Update listing error:', error);
+        console.error('Update lost/found item error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to update listing',
+            error: 'Failed to update lost/found item',
         });
     }
 };
 
-// Delete listing
-export const deleteListing = async (req: AuthRequest, res: Response): Promise<void> => {
+// Mark Lost/Found item as resolved (found/claimed)
+export const markLostFoundResolved = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const { listingId } = req.params;
+        const { itemId } = req.params;
 
-        // Check if listing exists and belongs to user
+        // Check if item belongs to user
         const { data: listing, error: fetchError } = await supabase
             .from('listings')
             .select('*')
-            .eq('id', listingId)
+            .eq('id', itemId)
             .eq('user_id', userId)
+            .in('listing_type', ['lost', 'found'])
             .single();
 
         if (fetchError || !listing) {
             res.status(404).json({
                 success: false,
-                error: 'Listing not found or you do not have permission to delete it',
+                error: 'Lost/Found item not found or you do not have permission to update it',
             });
             return;
         }
 
-        // Delete images from Cloudinary
-        if (listing.images) {
-            try {
-                const imageUrls = parseImages(listing.images);
-                await deleteMultipleImages(imageUrls);
-            } catch (deleteError) {
-                console.error('Image deletion error:', deleteError);
-            }
-        }
-
-        // Delete listing
-        const { error: deleteError } = await supabase
-            .from('listings')
-            .delete()
-            .eq('id', listingId);
-
-        if (deleteError) {
-            console.error('Delete error:', deleteError);
-            res.status(500).json({
-                success: false,
-                error: 'Failed to delete listing',
-            });
-            return;
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'Listing deleted successfully',
-        });
-    } catch (error) {
-        console.error('Delete listing error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to delete listing',
-        });
-    }
-};
-
-// Mark listing as sold/rented
-export const markListingStatus = async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
-        const userId = req.user?.userId;
-        const { listingId } = req.params;
-        const { status } = req.body;
-
-        if (!['active', 'sold', 'rented', 'inactive'].includes(status)) {
-            res.status(400).json({
-                success: false,
-                error: 'Invalid status',
-            });
-            return;
-        }
-
-        // Check if listing belongs to user
-        const { data: listing, error: fetchError } = await supabase
-            .from('listings')
-            .select('*')
-            .eq('id', listingId)
-            .eq('user_id', userId)
-            .single();
-
-        if (fetchError || !listing) {
-            res.status(404).json({
-                success: false,
-                error: 'Listing not found or you do not have permission to update it',
-            });
-            return;
-        }
-
-        // Update status
+        // Update status to resolved (using 'sold' status to indicate resolved)
         const { data: updatedListing, error: updateError } = await supabase
             .from('listings')
-            .update({ status })
-            .eq('id', listingId)
+            .update({ status: 'sold' }) // 'sold' means resolved/claimed
+            .eq('id', itemId)
             .select()
             .single();
 
@@ -588,31 +439,33 @@ export const markListingStatus = async (req: AuthRequest, res: Response): Promis
             console.error('Update error:', updateError);
             res.status(500).json({
                 success: false,
-                error: 'Failed to update listing status',
+                error: 'Failed to mark item as resolved',
             });
             return;
         }
 
         res.status(200).json({
             success: true,
-            message: 'Listing status updated successfully',
-            data: { listing: updatedListing },
+            message: `Item marked as ${listing.listing_type === 'lost' ? 'found' : 'claimed'}`,
+            data: { item: updatedListing },
         });
     } catch (error) {
-        console.error('Mark listing status error:', error);
+        console.error('Mark resolved error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to update listing status',
+            error: 'Failed to mark item as resolved',
         });
     }
 };
 
-// Get categories
-export const getCategories = async (req: AuthRequest, res: Response): Promise<void> => {
+// Get Lost & Found categories
+export const getLostFoundCategories = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const { data: categories, error } = await supabase
             .from('categories')
             .select('*')
+            .eq('type', 'lost_found')
+            .eq('is_active', true)
             .order('name', { ascending: true });
 
         if (error) {
@@ -624,20 +477,9 @@ export const getCategories = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        let sortedCategories = categories || [];
-
-        // Custom sort to put 'Others' last
-        if (sortedCategories.length > 0) {
-            sortedCategories = sortedCategories.sort((a, b) => {
-                if (a.name === 'Others') return 1;
-                if (b.name === 'Others') return -1;
-                return a.name.localeCompare(b.name);
-            });
-        }
-
         res.status(200).json({
             success: true,
-            data: { categories: sortedCategories },
+            data: { categories: categories || [] },
         });
     } catch (error) {
         console.error('Get categories error:', error);
