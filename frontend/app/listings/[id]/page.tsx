@@ -354,7 +354,7 @@ export default function ListingDetailPage() {
                                 {listing.title}
                                 {listing.status !== 'active' && (
                                     <span className={`px-3 py-1 rounded-full text-sm font-bold text-white ${listing.status === 'sold' ? 'bg-red-500' :
-                                            listing.status === 'rented' ? 'bg-orange-500' : 'bg-gray-600'
+                                        listing.status === 'rented' ? 'bg-orange-500' : 'bg-gray-600'
                                         }`}>
                                         {listing.status.toUpperCase()}
                                     </span>
@@ -423,7 +423,7 @@ export default function ListingDetailPage() {
                                             Mark as Active
                                         </Button>
                                     )}
-                                    <Link href={`/listings/edit/${listing.id}`}>
+                                    <Link href={`/listings/${listing.id}/edit`}>
                                         <Button className="w-full flex items-center justify-center">
                                             <Edit size={18} className="mr-2" />
                                             Edit Listing
@@ -460,7 +460,7 @@ export default function ListingDetailPage() {
             >
                 <div className="space-y-4">
                     <p className="text-gray-700">
-                        Are you sure you want to delete this listing? This action cannot be undone.
+                        Are you sure you want to delete this listing? You can restore it later from the History tab in My Listings.
                     </p>
                     <div className="flex gap-3">
                         <Button

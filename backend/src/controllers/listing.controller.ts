@@ -398,6 +398,16 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             existing_images,
         } = req.body;
 
+        console.log('📝 Update listing request:', {
+            listingId,
+            userId,
+            title,
+            category_id,
+            listing_type,
+            existing_images: typeof existing_images,
+            hasFiles: req.files ? (req.files as any[]).length : 0
+        });
+
         // Check if listing exists and belongs to user
         const { data: existingListing, error: fetchError } = await supabase
             .from('listings')
@@ -407,6 +417,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             .single();
 
         if (fetchError || !existingListing) {
+            console.error('❌ Listing not found:', fetchError);
             res.status(404).json({
                 success: false,
                 error: 'Listing not found or you do not have permission to edit it',
@@ -419,16 +430,26 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
 
         // Keep existing images that weren't removed
         if (existing_images) {
-            imageUrls = Array.isArray(existing_images) ? existing_images : JSON.parse(existing_images);
+            try {
+                imageUrls = Array.isArray(existing_images) ? existing_images : JSON.parse(existing_images);
+                console.log('✅ Parsed existing images:', imageUrls.length);
+            } catch (parseError) {
+                console.error('❌ Failed to parse existing_images:', parseError);
+                console.error('existing_images value:', existing_images);
+                // If parsing fails, try to use as-is or default to empty
+                imageUrls = [];
+            }
         }
 
         // Upload new images if provided
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
             try {
+                console.log(`📸 Uploading ${req.files.length} new images...`);
                 const newImageUrls = await uploadMultipleImages(req.files, 'thaparmarket/listings');
                 imageUrls = [...imageUrls, ...newImageUrls];
+                console.log(`✅ Total images after upload: ${imageUrls.length}`);
             } catch (uploadError) {
-                console.error('Image upload error:', uploadError);
+                console.error('❌ Image upload error:', uploadError);
                 res.status(500).json({
                     success: false,
                     error: 'Failed to upload images',
@@ -438,15 +459,19 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
         }
 
         // Delete removed images from Cloudinary
-        const oldImages = existingListing.images ? JSON.parse(existingListing.images) : [];
+        const oldImages = existingListing.images ? parseImages(existingListing.images) : [];
         const removedImages = oldImages.filter((img: string) => !imageUrls.includes(img));
         if (removedImages.length > 0) {
             try {
+                console.log(`🗑️ Deleting ${removedImages.length} removed images...`);
                 await deleteMultipleImages(removedImages);
             } catch (deleteError) {
-                console.error('Image deletion error:', deleteError);
+                console.error('⚠️ Image deletion error:', deleteError);
+                // Continue even if deletion fails
             }
         }
+
+        console.log('💾 Updating listing in database...');
 
         // Update listing
         const { data: updatedListing, error: updateError } = await supabase
@@ -467,13 +492,16 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             .single();
 
         if (updateError) {
-            console.error('Update error:', updateError);
+            console.error('❌ Database update error:', updateError);
             res.status(500).json({
                 success: false,
                 error: 'Failed to update listing',
+                details: updateError.message
             });
             return;
         }
+
+        console.log('✅ Listing updated successfully');
 
         res.status(200).json({
             success: true,
@@ -481,15 +509,16 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             data: { listing: updatedListing },
         });
     } catch (error) {
-        console.error('Update listing error:', error);
+        console.error('❌ Update listing error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to update listing',
+            details: error instanceof Error ? error.message : 'Unknown error'
         });
     }
 };
 
-// Delete listing
+// Delete listing (soft delete - mark as deleted)
 export const deleteListing = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
@@ -511,24 +540,14 @@ export const deleteListing = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        // Delete images from Cloudinary
-        if (listing.images) {
-            try {
-                const imageUrls = parseImages(listing.images);
-                await deleteMultipleImages(imageUrls);
-            } catch (deleteError) {
-                console.error('Image deletion error:', deleteError);
-            }
-        }
-
-        // Delete listing
-        const { error: deleteError } = await supabase
+        // Soft delete - mark as deleted instead of removing from database
+        const { error: updateError } = await supabase
             .from('listings')
-            .delete()
+            .update({ status: 'deleted' })
             .eq('id', listingId);
 
-        if (deleteError) {
-            console.error('Delete error:', deleteError);
+        if (updateError) {
+            console.error('Delete error:', updateError);
             res.status(500).json({
                 success: false,
                 error: 'Failed to delete listing',

@@ -31,10 +31,16 @@ export default function MyListingsPage() {
     const fetchMyListings = async () => {
         setIsLoading(true);
         try {
+            // Fetch ALL listings including deleted ones - don't filter by status
             const result = await listingService.getMyListings({ limit: 100 });
 
             if (result.success) {
-                setListings(result.data.listings);
+                // Filter out Lost & Found items - only show marketplace items (sell/rent)
+                // Keep ALL statuses including 'deleted'
+                const marketplaceListings = result.data.listings.filter(
+                    (listing: any) => listing.listing_type === 'sell' || listing.listing_type === 'rent'
+                );
+                setListings(marketplaceListings);
             }
         } catch (error: any) {
             const errorMessage = handleApiError(error);
@@ -63,7 +69,7 @@ export default function MyListingsPage() {
     };
 
     const tabs = [
-        { id: 'all', label: 'All', count: listings.length },
+        { id: 'all', label: 'All', count: listings.filter((l) => l.status !== 'deleted').length },
         {
             id: 'active',
             label: 'Active',
@@ -79,10 +85,15 @@ export default function MyListingsPage() {
             label: 'Expired',
             count: listings.filter((l) => l.status === 'expired').length,
         },
+        {
+            id: 'deleted',
+            label: 'History',
+            count: listings.filter((l) => l.status === 'deleted').length,
+        },
     ];
 
     const filteredListings = activeTab === 'all'
-        ? listings
+        ? listings.filter(l => l.status !== 'deleted')
         : listings.filter(l => l.status === activeTab);
 
     return (

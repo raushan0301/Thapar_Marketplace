@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Image from 'next/image';
 import { lostFoundService, LostFoundItem } from '@/services/lostFoundService';
 import { useAuthStore } from '@/store/authStore';
-import { ArrowLeft, MapPin, Calendar, Gift, Eye, MessageCircle, CheckCircle, Mail, User as UserIcon, RefreshCw } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Gift, Eye, MessageCircle, CheckCircle, Mail, User as UserIcon, RefreshCw, Edit, Trash } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 
 export default function LostFoundDetailPage() {
@@ -16,27 +18,46 @@ export default function LostFoundDetailPage() {
     const [selectedImage, setSelectedImage] = useState(0);
     const [resolving, setResolving] = useState(false);
 
+    const fetchRef = React.useRef<string | null>(null);
+
     useEffect(() => {
         if (!isAuthenticated) {
             router.push('/login');
             return;
         }
+
+        // Prevent double fetching in Strict Mode
+        if (fetchRef.current === params.itemId) return;
+        fetchRef.current = params.itemId as string;
+
         fetchItem();
     }, [isAuthenticated, params.itemId]);
 
     const fetchItem = async () => {
         try {
             setLoading(true);
-            const response = await lostFoundService.getItemById(params.itemId as string);
+
+            // Check if viewed recently (within 5 seconds) to prevent double counting
+            const viewKey = `last-view-time-${params.itemId}`;
+            const lastViewTime = parseInt(sessionStorage.getItem(viewKey) || '0');
+            const now = Date.now();
+            const shouldIncrement = (now - lastViewTime) > 5000;
+
+            if (shouldIncrement) {
+                sessionStorage.setItem(viewKey, now.toString());
+            }
+
+            const response = await lostFoundService.getItemById(params.itemId as string, shouldIncrement);
+
             if (response.success) {
                 setItem(response.data.item);
             } else {
-                alert('Item not found');
+                toast.error('Item not found');
                 router.push('/lost-found');
             }
         } catch (error) {
             console.error('Failed to fetch item:', error);
-            alert('Failed to load item details');
+            toast.error('Failed to load item details');
             router.push('/lost-found');
         } finally {
             setLoading(false);
@@ -83,6 +104,30 @@ export default function LostFoundDetailPage() {
         if (!item) return;
         // Navigate to messages/chat with this user about this item
         router.push(`/messages?user=${item.user_id}&listing=${item.id}`);
+    };
+
+    const handleEdit = () => {
+        if (!item) return;
+        router.push(`/lost-found/${item.id}/edit`);
+    };
+
+    const handleDelete = async () => {
+        if (!item) return;
+
+        if (!confirm('Are you sure you want to delete this item? You can view it later in the History tab.')) {
+            return;
+        }
+
+        try {
+            const response = await lostFoundService.deleteItem(item.id);
+            if (response.success) {
+                toast.success('Item deleted successfully!');
+                router.push('/lost-found');
+            }
+        } catch (error) {
+            console.error('Failed to delete:', error);
+            toast.error('Failed to delete item');
+        }
     };
 
     const formatDate = (dateString: string) => {
@@ -140,10 +185,12 @@ export default function LostFoundDetailPage() {
                                 <>
                                     {/* Main Image */}
                                     <div className="relative h-96 bg-gray-100">
-                                        <img
+                                        <Image
                                             src={item.images[selectedImage]}
                                             alt={item.title}
-                                            className="w-full h-full object-contain"
+                                            fill
+                                            className="object-contain"
+                                            sizes="(max-width: 768px) 100vw, 800px"
                                         />
                                     </div>
 
@@ -154,15 +201,17 @@ export default function LostFoundDetailPage() {
                                                 <button
                                                     key={index}
                                                     onClick={() => setSelectedImage(index)}
-                                                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${selectedImage === index
+                                                    className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${selectedImage === index
                                                         ? 'border-blue-600 ring-2 ring-blue-200'
                                                         : 'border-gray-200 hover:border-blue-300'
                                                         }`}
                                                 >
-                                                    <img
+                                                    <Image
                                                         src={img}
                                                         alt={`${item.title} ${index + 1}`}
-                                                        className="w-full h-full object-cover"
+                                                        fill
+                                                        className="object-cover"
+                                                        sizes="80px"
                                                     />
                                                 </button>
                                             ))}
@@ -320,6 +369,24 @@ export default function LostFoundDetailPage() {
                                             <p className="text-xs text-gray-500 text-center">
                                                 This will remove the item from active listings
                                             </p>
+
+                                            {/* Edit and Delete Buttons */}
+                                            <div className="mt-4 flex gap-2">
+                                                <button
+                                                    onClick={handleEdit}
+                                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors border border-blue-200"
+                                                >
+                                                    <Edit size={18} />
+                                                    Edit Item
+                                                </button>
+                                                <button
+                                                    onClick={handleDelete}
+                                                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors border border-red-200"
+                                                >
+                                                    <Trash size={18} />
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </>
                                     )
                                 ) : (

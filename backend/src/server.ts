@@ -146,6 +146,8 @@ httpServer.listen(PORT, () => {
   ║                                                   ║
   ╚═══════════════════════════════════════════════════╝
   `);
+    // Log active rate limit
+    console.log(`   Rate Limit: ${process.env.RATE_LIMIT_MAX_REQUESTS || 'Default'} requests / 15min`);
 });
 
 // Handle unhandled promise rejections

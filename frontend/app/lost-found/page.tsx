@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { lostFoundService, LostFoundItem } from '@/services/lostFoundService';
 import { useAuthStore } from '@/store/authStore';
-import { Search, MapPin, Calendar, Gift, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Search, MapPin, Calendar, Gift, AlertCircle, CheckCircle2, RefreshCw, Edit, Trash, CheckCircle, Eye } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function LostFoundPage() {
     const router = useRouter();
@@ -12,7 +14,7 @@ export default function LostFoundPage() {
     const { user, isAuthenticated } = useAuthStore();
     const [items, setItems] = useState<LostFoundItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'all' | 'lost' | 'found' | 'history'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'lost' | 'found' | 'mine' | 'history'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [locationFilter, setLocationFilter] = useState('');
 
@@ -45,6 +47,9 @@ export default function LostFoundPage() {
 
             if (activeTab === 'history') {
                 filters.status = 'sold';
+            } else if (activeTab === 'mine') {
+                // Show user's own items (both active and resolved)
+                filters.status = 'active';
             } else {
                 filters.status = 'active';
                 if (activeTab !== 'all') {
@@ -62,7 +67,14 @@ export default function LostFoundPage() {
 
             const response = await lostFoundService.getItems(filters);
             if (response.success) {
-                setItems(response.data.items || []);
+                let fetchedItems = response.data.items || [];
+
+                // If "My Items" tab, filter to show only user's items
+                if (activeTab === 'mine') {
+                    fetchedItems = fetchedItems.filter((item: LostFoundItem) => item.user_id === user?.id);
+                }
+
+                setItems(fetchedItems);
             }
         } catch (error) {
             console.error('Failed to fetch items:', error);
@@ -85,10 +97,55 @@ export default function LostFoundPage() {
         try {
             const response = await lostFoundService.reactivateItem(itemId);
             if (response.success) {
+                toast.success('Item reactivated successfully!');
                 fetchItems();
             }
         } catch (error) {
             console.error('Reactivation failed:', error);
+            toast.error('Failed to reactivate item');
+        }
+    };
+
+    const handleEditItem = (e: React.MouseEvent, itemId: string) => {
+        e.stopPropagation();
+        router.push(`/lost-found/${itemId}/edit`);
+    };
+
+    const handleDeleteItem = async (e: React.MouseEvent, itemId: string) => {
+        e.stopPropagation();
+
+        if (!confirm('Are you sure you want to delete this item? You can view it later in the History tab.')) {
+            return;
+        }
+
+        try {
+            const response = await lostFoundService.deleteItem(itemId);
+            if (response.success) {
+                toast.success('Item deleted successfully!');
+                setItems(prev => prev.filter(item => item.id !== itemId));
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+            toast.error('Failed to delete item');
+        }
+    };
+
+    const handleMarkAsClaimed = async (e: React.MouseEvent, itemId: string) => {
+        e.stopPropagation();
+
+        if (!confirm('Mark this item as claimed/found? This will move it to history.')) {
+            return;
+        }
+
+        try {
+            const response = await lostFoundService.markResolved(itemId);
+            if (response.success) {
+                toast.success('Item marked as resolved!');
+                fetchItems();
+            }
+        } catch (error) {
+            console.error('Mark as claimed failed:', error);
+            toast.error('Failed to mark item as claimed');
         }
     };
 
@@ -206,6 +263,15 @@ export default function LostFoundPage() {
                             🟢 Found
                         </button>
                         <button
+                            onClick={() => setActiveTab('mine')}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'mine'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                }`}
+                        >
+                            👤 My Items
+                        </button>
+                        <button
                             onClick={() => setActiveTab('history')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'history'
                                 ? 'bg-gray-800 text-white'
@@ -250,11 +316,15 @@ export default function LostFoundPage() {
                                 {/* Image */}
                                 <div className="relative h-48 bg-gray-100">
                                     {item.images && item.images.length > 0 ? (
-                                        <img
-                                            src={item.images[0]}
-                                            alt={item.title}
-                                            className="w-full h-full object-cover"
-                                        />
+                                        <div className="relative w-full h-full">
+                                            <Image
+                                                src={item.images[0]}
+                                                alt={item.title}
+                                                fill
+                                                className="object-cover"
+                                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                            />
+                                        </div>
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-gray-400">
                                             <span className="text-6xl">
@@ -262,6 +332,12 @@ export default function LostFoundPage() {
                                             </span>
                                         </div>
                                     )}
+                                    {/* View Count Badge */}
+                                    <div className="absolute top-3 left-3 bg-black/50 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1 backdrop-blur-sm z-10">
+                                        <Eye size={12} />
+                                        <span>{item.views || 0}</span>
+                                    </div>
+
                                     {/* Badge */}
                                     <div
                                         className={`absolute top-3 right-3 px-3 py-1 rounded-full text-white font-semibold text-xs ${activeTab === 'history' ? 'bg-gray-600' :
@@ -336,6 +412,35 @@ export default function LostFoundPage() {
                                             </p>
                                         </div>
                                     </div>
+
+                                    {/* Action Buttons for My Items Tab */}
+                                    {activeTab === 'mine' && user?.id === item.user_id && (
+                                        <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
+                                            <button
+                                                onClick={(e) => handleEditItem(e, item.id)}
+                                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
+                                                title="Edit Item"
+                                            >
+                                                <Edit size={16} />
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleMarkAsClaimed(e, item.id)}
+                                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 transition-colors"
+                                                title="Mark as Claimed/Found"
+                                            >
+                                                <CheckCircle size={16} />
+                                                Claimed
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDeleteItem(e, item.id)}
+                                                className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                                                title="Delete Item"
+                                            >
+                                                <Trash size={16} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}

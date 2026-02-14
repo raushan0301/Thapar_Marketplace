@@ -61,12 +61,13 @@ export const lostFoundService = {
     },
 
     // Get single lost/found item by ID
-    async getItemById(itemId: string) {
+    async getItemById(itemId: string, increment = true) {
         const token = localStorage.getItem('token');
         const response = await axios.get(`${API_URL}/lost-found/${itemId}`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
+            params: { increment }
         });
 
         return response.data;
@@ -126,6 +127,18 @@ export const lostFoundService = {
                 },
             }
         );
+
+        return response.data;
+    },
+
+    // Delete lost/found item
+    async deleteItem(itemId: string) {
+        const token = localStorage.getItem('token');
+        const response = await axios.delete(`${API_URL}/lost-found/${itemId}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
 
         return response.data;
     },

@@ -10,6 +10,7 @@ export interface CreateListingData {
     location?: string;
     rental_duration?: string;
     images?: File[];
+    existing_images?: string[];
 }
 
 export const listingService = {
@@ -71,9 +72,18 @@ export const listingService = {
         if (data.title) formData.append('title', data.title);
         if (data.description) formData.append('description', data.description);
         if (data.price) formData.append('price', data.price.toString());
+        if (data.category_id) formData.append('category_id', data.category_id.toString());
         if (data.condition) formData.append('condition', data.condition);
+        if (data.listing_type) formData.append('listing_type', data.listing_type);
         if (data.location) formData.append('location', data.location);
         if (data.rental_duration) formData.append('rental_duration', data.rental_duration);
+
+        // Handle existing images
+        if (data.existing_images) {
+            formData.append('existing_images', JSON.stringify(data.existing_images));
+        }
+
+        // Handle new images
         if (data.images && data.images.length > 0) {
             data.images.forEach((image) => {
                 formData.append('images', image);

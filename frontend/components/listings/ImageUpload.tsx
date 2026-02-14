@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import NextImage from 'next/image';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -7,6 +8,7 @@ interface ImageUploadProps {
     setImages: (images: File[]) => void;
     maxImages?: number;
     maxSizeMB?: number;
+    existingCount?: number; // Number of existing images (for edit mode)
 }
 
 export const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -14,6 +16,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     setImages,
     maxImages = 6,
     maxSizeMB = 5,
+    existingCount = 0,
 }) => {
     const [previews, setPreviews] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,9 +41,15 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             return;
         }
 
-        // Check if adding these would exceed max
-        if (images.length + imageFiles.length > maxImages) {
-            toast.error(`You can only upload up to ${maxImages} images`);
+        // Check if adding these would exceed max (including existing images)
+        const totalAfterAdd = existingCount + images.length + imageFiles.length;
+        if (totalAfterAdd > maxImages) {
+            const remaining = maxImages - existingCount - images.length;
+            if (remaining === 0) {
+                toast.error(`Maximum ${maxImages} images already added. Please remove some images to add new ones.`);
+            } else {
+                toast.error(`You can only add ${remaining} more image${remaining !== 1 ? 's' : ''}. You have ${existingCount} existing + ${images.length} new = ${existingCount + images.length} total.`);
+            }
             return;
         }
 
@@ -110,11 +119,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             {previews.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                     {previews.map((preview, index) => (
-                        <div key={index} className="relative group">
-                            <img
+                        <div key={index} className="relative group w-full h-32">
+                            <NextImage
                                 src={preview}
                                 alt={`Preview ${index + 1}`}
-                                className="w-full h-32 object-cover rounded-lg"
+                                fill
+                                className="object-cover rounded-lg"
+                                sizes="300px"
                             />
                             <button
                                 type="button"
@@ -126,16 +137,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                             >
                                 <X size={16} />
                             </button>
-                            {index === 0 && (
-                                <div className="absolute bottom-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                                    Cover
-                                </div>
-                            )}
+
                         </div>
                     ))}
 
                     {/* Add More Button */}
-                    {images.length < maxImages && (
+                    {existingCount + images.length < maxImages && (
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
@@ -149,7 +156,10 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             )}
 
             <p className="text-xs text-gray-500 mt-2">
-                {images.length} of {maxImages} images selected. First image will be the cover.
+                {existingCount > 0
+                    ? `${existingCount + images.length} of ${maxImages} images total (${existingCount} existing + ${images.length} new).`
+                    : `${images.length} of ${maxImages} images selected. First image will be the cover.`
+                }
             </p>
         </div>
     );

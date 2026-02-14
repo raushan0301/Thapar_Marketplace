@@ -253,8 +253,10 @@ export const getLostFoundItemById = async (req: AuthRequest, res: Response): Pro
             .in('listing_type', ['lost', 'found'])
             .single();
 
-        // Increment views
-        if (listing) {
+        // Increment views (unless increment=false query param is present)
+        const shouldIncrement = req.query.increment !== 'false';
+
+        if (listing && shouldIncrement) {
             const newViews = (listing.views || 0) + 1;
             supabase.from('listings')
                 .update({ views: newViews })

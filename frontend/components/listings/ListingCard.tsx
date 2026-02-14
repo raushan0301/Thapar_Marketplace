@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Clock, User, MapPin, Eye } from 'lucide-react';
 
 interface ListingCardProps {
@@ -61,10 +62,12 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
                         </div>
                     )}
                     {listing.images && listing.images.length > 0 ? (
-                        <img
+                        <Image
                             src={listing.images[0]}
                             alt={listing.title}
-                            className={`w-full h-full object-cover ${listing.status === 'sold' ? 'grayscale opacity-80' : ''}`}
+                            fill
+                            className={`object-cover ${listing.status === 'sold' ? 'grayscale opacity-80' : ''}`}
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">
