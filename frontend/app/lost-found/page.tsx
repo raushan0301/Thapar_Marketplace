@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { lostFoundService, LostFoundItem } from '@/services/lostFoundService';
@@ -8,7 +8,9 @@ import { useAuthStore } from '@/store/authStore';
 import { Search, MapPin, Calendar, Gift, AlertCircle, CheckCircle2, RefreshCw, Edit, Trash, CheckCircle, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function LostFoundPage() {
+export const dynamic = 'force-dynamic';
+
+function LostFoundContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user, isAuthenticated } = useAuthStore();
@@ -448,5 +450,14 @@ export default function LostFoundPage() {
                 )}
             </div>
         </div>
+    );
+}
+
+
+export default function LostFoundPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>}>
+            <LostFoundContent />
+        </Suspense>
     );
 }

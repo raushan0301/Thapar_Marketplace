@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { lostFoundService } from '@/services/lostFoundService';
 import { useAuthStore } from '@/store/authStore';
 import { Upload, X, MapPin, Calendar, Gift, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
 
-export default function CreateLostFoundPage() {
+export const dynamic = 'force-dynamic';
+
+function CreateLostFoundContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { isAuthenticated } = useAuthStore();
@@ -336,5 +338,14 @@ export default function CreateLostFoundPage() {
                 </form>
             </div>
         </div>
+    );
+}
+
+
+export default function CreateLostFoundPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>}>
+            <CreateLostFoundContent />
+        </Suspense>
     );
 }

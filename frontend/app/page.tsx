@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { listingService } from '@/services/listingService';
 import { ListingCard } from '@/components/listings/ListingCard';
 import { Button } from '@/components/ui/Button';
@@ -11,7 +11,9 @@ import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function HomePage() {
+export const dynamic = 'force-dynamic';
+
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
@@ -279,5 +281,14 @@ export default function HomePage() {
         )}
       </div>
     </div>
+  );
+}
+
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }

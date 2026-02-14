@@ -10,6 +10,8 @@ import { handleApiError } from '@/lib/api';
 import { Lock, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 function ResetPasswordContent() {
     const router = useRouter();
     const searchParams = useSearchParams();

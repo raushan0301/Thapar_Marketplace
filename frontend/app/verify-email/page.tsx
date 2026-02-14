@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 import { handleApiError } from '@/lib/api';
 
+export const dynamic = 'force-dynamic';
+
 function VerifyEmailContent() {
     const router = useRouter();
     const searchParams = useSearchParams();

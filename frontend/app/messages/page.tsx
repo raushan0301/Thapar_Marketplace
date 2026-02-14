@@ -13,6 +13,8 @@ import { handleApiError } from '@/lib/api';
 import { Send, MessageSquare, ArrowLeft, X, Mail, Phone, Building, Home } from 'lucide-react';
 import { eventBus } from '@/lib/eventBus';
 
+export const dynamic = 'force-dynamic';
+
 function MessagesContent() {
     const router = useRouter();
     const searchParams = useSearchParams();

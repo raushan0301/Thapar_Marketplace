@@ -4,6 +4,7 @@ import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { Toaster } from "react-hot-toast";
+import { Suspense } from "react";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,7 +25,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
         <div className="flex flex-col min-h-screen">
-          <Navbar />
+          <Suspense fallback={<div className="h-16 bg-white shadow-md" />}>
+            <Navbar />
+          </Suspense>
           <main className="flex-grow">{children}</main>
           <Footer />
         </div>
