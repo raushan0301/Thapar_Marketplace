@@ -587,3 +587,78 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
         });
     }
 };
+
+// Impersonate User (Admin Only)
+export const impersonateUser = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        // 1. Check if requester is Admin
+        if (!req.user?.isAdmin) {
+            res.status(403).json({
+                success: false,
+                error: 'Access denied. Admin privileges required.',
+            });
+            return;
+        }
+
+        const { targetEmail } = req.body;
+
+        if (!targetEmail) {
+            res.status(400).json({
+                success: false,
+                error: 'Target email is required',
+            });
+            return;
+        }
+
+        // 2. Find target user
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', targetEmail)
+            .single();
+
+        if (error || !user) {
+            res.status(404).json({
+                success: false,
+                error: 'Target user not found',
+            });
+            return;
+        }
+
+        // 3. Generate token for TARGET user
+        const token = generateToken({
+            userId: user.id,
+            email: user.email,
+            isAdmin: user.is_admin || false
+        });
+
+        // 4. Return success (Same format as login)
+        res.status(200).json({
+            success: true,
+            message: `Impersonating user: ${user.name}`,
+            data: {
+                token,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    phone: user.phone,
+                    department: user.department,
+                    year: user.year,
+                    hostel: user.hostel,
+                    profile_picture: user.profile_picture,
+                    trust_score: user.trust_score,
+                    is_admin: user.is_admin,
+                    created_at: user.created_at,
+                },
+            },
+        });
+
+    } catch (error) {
+        console.error('Impersonation error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Impersonation failed',
+        });
+    }
+};

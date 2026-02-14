@@ -9,8 +9,9 @@ import {
     requestPasswordReset,
     resetPassword,
     getUserPublicProfile,
+    impersonateUser,
 } from '../controllers/auth.controller';
-import { authenticate } from '../middleware/auth';
+import { authenticate, isAdmin } from '../middleware/auth';
 import { validate, registerSchema, loginSchema } from '../middleware/validation';
 import { upload } from '../middleware/upload';
 
@@ -28,5 +29,6 @@ router.post('/reset-password', resetPassword);
 router.get('/me', authenticate, getCurrentUser);
 router.get('/users/:id', authenticate, getUserPublicProfile);
 router.put('/profile', authenticate, upload.single('profile_picture'), updateProfile);
+router.post('/impersonate', authenticate, isAdmin, impersonateUser); // Admin only
 
 export default router;

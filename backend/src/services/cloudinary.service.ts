@@ -16,6 +16,7 @@ export const uploadImage = async (
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 folder,
+                asset_folder: folder, // Force visual folder location in Media Library
                 resource_type: 'image',
                 transformation: [
                     { quality: 'auto', fetch_format: 'auto' },

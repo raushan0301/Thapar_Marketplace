@@ -1,10 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit from 'express-rate-limit'; // Security: Limit request rate
+import hpp from 'hpp'; // Security: Prevent HTTP Parameter Pollution
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
@@ -57,7 +59,11 @@ const io = new Server(httpServer, {
         credentials: true,
     },
 });
+// Security Middleware
+app.use(helmet());
+app.use(hpp());
 
+// CORS Middleware
 // Middleware
 app.use(cors({
     origin: getOrigin(),
@@ -68,12 +74,47 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting
-const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5800000'), // Increased for testing
-    message: 'Too many requests from this IP, please try again later.',
+// Smart Rate Limiter (User-Based)
+// - Authenticated Users: Keyed by User ID (Each student gets own limit)
+// - Guests: Keyed by IP (All guests on campus WiFi share this limit)
+const userLimiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
+    max: 5000, // 5000 requests per 15 min (Per user or Per IP)
+    message: 'Too many requests, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+        // 1. Try to identify user from token
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.substring(7);
+            try {
+                // Decode without verifying (verification happens in auth middleware)
+                const decoded = jwt.decode(token) as any;
+                if (decoded && decoded.userId) {
+                    return decoded.userId; // Key by User ID
+                }
+            } catch (error) {
+                // Invalid token, fall back to IP
+            }
+        }
+        // 2. Fall back to IP for guests
+        return req.ip || 'unknown-ip';
+    }
 });
-app.use('/api/', limiter);
+app.use('/api/', userLimiter);
+
+// Strict Auth Limiter (Brute Force Protection)
+// Higher threshold (100) to allow for shared IP, but prevents massive brute force
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100,
+    message: 'Too many login attempts, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // Health check route
 app.get('/health', (_req, res) => {
