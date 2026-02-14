@@ -103,12 +103,12 @@ function MessagesContent() {
     const fetchConversations = async () => {
         try {
             setError(null);
-            console.log('📬 Fetching conversations...');
+
             const result = await messageService.getConversations();
-            console.log('✅ Conversations result:', result);
+
             if (result.success) {
                 setConversations(result.data.conversations);
-                console.log(`✅ Loaded ${result.data.conversations.length} conversations`);
+
             } else {
                 setError(result.error || 'Failed to load conversations');
             }
@@ -122,8 +122,8 @@ function MessagesContent() {
     };
 
     const handleSelectConversation = async (conversation: any) => {
-        console.log('🔍 Selected conversation:', conversation);
-        console.log('🔍 other_user_id:', conversation.other_user_id);
+
+
 
         if (!conversation.other_user_id) {
             console.error('❌ No other_user_id in conversation:', conversation);

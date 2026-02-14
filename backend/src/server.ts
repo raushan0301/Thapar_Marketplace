@@ -24,8 +24,7 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize Socket.IO
-// CORS Configuration
+
 const getOrigin = () => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     if (frontendUrl === '*') return true;
@@ -95,12 +94,11 @@ app.use('/api/lost-found', lostFoundRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-    console.log(`✅ User connected: ${socket.id}`);
+
 
     // Join a chat room
     socket.on('join_chat', (chatId: string) => {
         socket.join(chatId);
-        console.log(`User ${socket.id} joined chat ${chatId}`);
     });
 
     // Send message
@@ -115,7 +113,6 @@ io.on('connection', (socket) => {
 
     // Disconnect
     socket.on('disconnect', () => {
-        console.log(`❌ User disconnected: ${socket.id}`);
     });
 });
 
@@ -133,21 +130,9 @@ app.use(errorHandler);
 // Start server
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
-    console.log(`
-  ╔═══════════════════════════════════════════════════╗
-  ║                                                   ║
-  ║   🎓 ThaparMarket API Server                     ║
-  ║                                                   ║
-  ║   🚀 Server running on port ${PORT}                 ║
-  ║   🌍 Environment: ${process.env.NODE_ENV || 'development'}                    ║
-  ║   📡 Socket.IO enabled                           ║
-  ║                                                   ║
-  ║   Health check: http://localhost:${PORT}/health     ║
-  ║                                                   ║
-  ╚═══════════════════════════════════════════════════╝
-  `);
-    // Log active rate limit
-    console.log(`   Rate Limit: ${process.env.RATE_LIMIT_MAX_REQUESTS || 'Default'} requests / 15min`);
+    console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    console.log(`📡 Socket.IO enabled`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
 });
 
 // Handle unhandled promise rejections

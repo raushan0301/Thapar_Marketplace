@@ -47,9 +47,9 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
         let imageUrls: string[] = [];
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
             try {
-                console.log(`📸 Uploading ${req.files.length} images...`);
+
                 imageUrls = await uploadMultipleImages(req.files, 'thaparmarket/listings');
-                console.log(`✅ Images uploaded successfully: ${imageUrls.length} images`);
+
             } catch (uploadError) {
                 console.error('Image upload error:', uploadError);
                 res.status(500).json({
@@ -60,7 +60,7 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
             }
         }
 
-        console.log('💾 Inserting listing into database...');
+
 
         // Insert listing
         const { data: listing, error } = await supabase
@@ -91,7 +91,7 @@ export const createListing = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        console.log('✅ Listing created successfully!');
+
 
         res.status(201).json({
             success: true,
@@ -398,15 +398,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             existing_images,
         } = req.body;
 
-        console.log('📝 Update listing request:', {
-            listingId,
-            userId,
-            title,
-            category_id,
-            listing_type,
-            existing_images: typeof existing_images,
-            hasFiles: req.files ? (req.files as any[]).length : 0
-        });
+
 
         // Check if listing exists and belongs to user
         const { data: existingListing, error: fetchError } = await supabase
@@ -432,7 +424,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
         if (existing_images) {
             try {
                 imageUrls = Array.isArray(existing_images) ? existing_images : JSON.parse(existing_images);
-                console.log('✅ Parsed existing images:', imageUrls.length);
+
             } catch (parseError) {
                 console.error('❌ Failed to parse existing_images:', parseError);
                 console.error('existing_images value:', existing_images);
@@ -444,10 +436,10 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
         // Upload new images if provided
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
             try {
-                console.log(`📸 Uploading ${req.files.length} new images...`);
+
                 const newImageUrls = await uploadMultipleImages(req.files, 'thaparmarket/listings');
                 imageUrls = [...imageUrls, ...newImageUrls];
-                console.log(`✅ Total images after upload: ${imageUrls.length}`);
+
             } catch (uploadError) {
                 console.error('❌ Image upload error:', uploadError);
                 res.status(500).json({
@@ -463,7 +455,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
         const removedImages = oldImages.filter((img: string) => !imageUrls.includes(img));
         if (removedImages.length > 0) {
             try {
-                console.log(`🗑️ Deleting ${removedImages.length} removed images...`);
+
                 await deleteMultipleImages(removedImages);
             } catch (deleteError) {
                 console.error('⚠️ Image deletion error:', deleteError);
@@ -471,7 +463,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             }
         }
 
-        console.log('💾 Updating listing in database...');
+
 
         // Update listing
         const { data: updatedListing, error: updateError } = await supabase
@@ -501,7 +493,7 @@ export const updateListing = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        console.log('✅ Listing updated successfully');
+
 
         res.status(200).json({
             success: true,
