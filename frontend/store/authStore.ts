@@ -6,6 +6,9 @@ interface User {
     email: string;
     name: string;
     phone?: string;
+    department?: string;
+    year?: string | number;
+    hostel?: string;
     profile_picture?: string;
     is_admin: boolean;
     trust_score: string;

@@ -138,8 +138,7 @@ export const getLostFoundItems = async (req: AuthRequest, res: Response): Promis
                     id,
                     name,
                     profile_picture,
-                    trust_score,
-                    phone
+                    trust_score
                 ),
                 categories:category_id (
                     id,
@@ -147,8 +146,11 @@ export const getLostFoundItems = async (req: AuthRequest, res: Response): Promis
                     icon
                 )
             `, { count: 'exact' })
-            .in('listing_type', ['lost', 'found'])
-            .eq('status', 'active');
+            .in('listing_type', ['lost', 'found']);
+
+        // Filter by status (default to active)
+        const statusFilter = req.query.status as string || 'active';
+        query = query.eq('status', statusFilter);
 
         // Apply filters
         if (category_id) {
@@ -199,7 +201,6 @@ export const getLostFoundItems = async (req: AuthRequest, res: Response): Promis
             poster_name: listing.users?.name,
             poster_profile_picture: listing.users?.profile_picture,
             poster_trust_score: listing.users?.trust_score,
-            poster_phone: listing.users?.phone,
             category_name: listing.categories?.name,
             category_icon: listing.categories?.icon,
         })) || [];
@@ -238,7 +239,6 @@ export const getLostFoundItemById = async (req: AuthRequest, res: Response): Pro
                     id,
                     name,
                     email,
-                    phone,
                     profile_picture,
                     trust_score,
                     created_at
@@ -279,7 +279,6 @@ export const getLostFoundItemById = async (req: AuthRequest, res: Response): Pro
             images: parseImages(listing.images),
             poster_name: listing.users?.name,
             poster_email: listing.users?.email,
-            poster_phone: listing.users?.phone,
             poster_profile_picture: listing.users?.profile_picture,
             poster_trust_score: listing.users?.trust_score,
             category_name: listing.categories?.name,
@@ -458,13 +457,55 @@ export const markLostFoundResolved = async (req: AuthRequest, res: Response): Pr
     }
 };
 
+// Reactivate Lost/Found item
+export const reactivateLostFoundItem = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        const { itemId } = req.params;
+
+        const { data: listing, error: fetchError } = await supabase
+            .from('listings')
+            .select('*')
+            .eq('id', itemId)
+            .eq('user_id', userId)
+            .in('listing_type', ['lost', 'found'])
+            .single();
+
+        if (fetchError || !listing) {
+            res.status(404).json({ success: false, error: 'Item not found or permission denied' });
+            return;
+        }
+
+        const { data: updatedListing, error: updateError } = await supabase
+            .from('listings')
+            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .eq('id', itemId)
+            .select()
+            .single();
+
+        if (updateError) {
+            console.error('Reactivate error:', updateError);
+            res.status(500).json({ success: false, error: 'Failed to reactivate item' });
+            return;
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Item reactivated successfully',
+            data: { item: updatedListing },
+        });
+    } catch (error) {
+        console.error('Reactivate error:', error);
+        res.status(500).json({ success: false, error: 'Failed to reactivate item' });
+    }
+};
+
 // Get Lost & Found categories
 export const getLostFoundCategories = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const { data: categories, error } = await supabase
             .from('categories')
             .select('*')
-            .eq('type', 'lost_found')
             .eq('is_active', true)
             .order('name', { ascending: true });
 

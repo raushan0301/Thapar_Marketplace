@@ -17,6 +17,7 @@ interface ListingCardProps {
         created_at: string;
         seller_name?: string;
         seller_profile_picture?: string;
+        status?: string;
     };
 }
 
@@ -45,11 +46,25 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
             <div className="bg-white rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200 flex flex-col h-full">
                 {/* Image */}
                 <div className="relative h-48 bg-gray-100 flex-shrink-0">
+                    {listing.status === 'sold' ? (
+                        <div className="absolute top-0 left-0 overflow-hidden w-32 h-32 z-20">
+                            <div className="absolute top-[28px] left-[-42px] w-[170px] bg-red-600 text-white text-sm font-bold py-2 text-center transform -rotate-45 shadow-md uppercase tracking-wider">
+                                SOLD
+                            </div>
+                        </div>
+                    ) : listing.status && listing.status !== 'active' && (
+                        <div className="absolute top-2 left-2 z-10">
+                            <span className={`px-2 py-1 rounded text-xs font-bold text-white shadow-sm uppercase ${listing.status === 'rented' ? 'bg-orange-500' : 'bg-gray-600'
+                                }`}>
+                                {listing.status}
+                            </span>
+                        </div>
+                    )}
                     {listing.images && listing.images.length > 0 ? (
                         <img
                             src={listing.images[0]}
                             alt={listing.title}
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover ${listing.status === 'sold' ? 'grayscale opacity-80' : ''}`}
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">

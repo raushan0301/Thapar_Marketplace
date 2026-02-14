@@ -1,0 +1,2 @@
+-- Legacy migration file. Categories are now managed via schema.sql and initial seed.
+-- This file is intentionally emptied to prevent re-insertion of deprecated categories.

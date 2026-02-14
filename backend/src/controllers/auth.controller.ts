@@ -376,7 +376,7 @@ export const getUserPublicProfile = async (
 
         const { data: user, error } = await supabase
             .from('users')
-            .select('id, name, profile_picture, trust_score, created_at')
+            .select('id, name, email, department, year, hostel, profile_picture, trust_score, created_at')
             .eq('id', id)
             .single();
 
@@ -408,13 +408,16 @@ export const updateProfile = async (
 ): Promise<void> => {
     try {
         const userId = req.user?.userId;
-        const { name, phone } = req.body;
+        const { name, phone, department, year, hostel } = req.body;
         const profilePicture = req.file;
 
         let updateData: any = {};
 
         if (name) updateData.name = name;
         if (phone) updateData.phone = phone;
+        if (department) updateData.department = department;
+        if (year) updateData.year = year;
+        if (hostel) updateData.hostel = hostel;
 
         // Upload profile picture if provided
         if (profilePicture) {
@@ -436,7 +439,7 @@ export const updateProfile = async (
             .from('users')
             .update(updateData)
             .eq('id', userId)
-            .select('id, email, name, phone, profile_picture, trust_score, is_admin, created_at')
+            .select('id, email, name, phone, department, year, hostel, profile_picture, trust_score, is_admin, created_at')
             .single();
 
         if (error) {

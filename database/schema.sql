@@ -186,15 +186,14 @@ $$ LANGUAGE plpgsql;
 
 -- Insert default categories
 INSERT INTO categories (name, type, icon, description) VALUES
-  ('Books', 'buy_sell', '📚', 'Textbooks, novels, study materials'),
-  ('Electronics', 'buy_sell', '💻', 'Laptops, phones, gadgets'),
-  ('Furniture', 'buy_sell', '🪑', 'Chairs, tables, storage'),
-  ('Clothing', 'buy_sell', '👕', 'Clothes, shoes, accessories'),
-  ('Stationery', 'buy_sell', '✏️', 'Pens, notebooks, supplies'),
+  ('Electronics', 'buy_sell', '📱', 'Phones, laptops, gadgets'),
+  ('Books & Study Material', 'buy_sell', '📚', 'Textbooks, novels, notes'),
+  ('Furniture', 'buy_sell', '🪑', 'Chairs, tables, beds'),
+  ('Clothing', 'buy_sell', '👕', 'Clothes, shoes, fashion'),
+  ('Accessories', 'buy_sell', '🎒', 'Bags, watches, jewelry'),
+  ('Bikes & Transport', 'buy_sell', '🚲', 'Bicycles, scooters, vehicles'),
   ('Sports Equipment', 'buy_sell', '⚽', 'Sports gear and equipment'),
   ('Musical Instruments', 'buy_sell', '🎸', 'Guitars, keyboards, etc.'),
-  ('Bikes', 'rental', '🚲', 'Bicycles for rent'),
-  ('Sports Gear', 'rental', '🏀', 'Sports equipment rental'),
-  ('Electronics Rental', 'rental', '🎮', 'Gaming consoles, cameras'),
-  ('Lost Items', 'lost_found', '🔍', 'Report lost items'),
-  ('Found Items', 'lost_found', '✅', 'Report found items');
+  ('Personal Items', 'buy_sell', '👜', 'Wallets, keys, ID cards'),
+  ('Stationery', 'buy_sell', '✏️', 'Pens, notebooks, supplies'),
+  ('Miscellaneous', 'buy_sell', '📦', 'Other items');

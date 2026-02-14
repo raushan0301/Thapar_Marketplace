@@ -21,6 +21,9 @@ export default function ProfilePage() {
         name: '',
         email: '',
         phone: '',
+        department: '',
+        year: '',
+        hostel: '',
     });
 
     useEffect(() => {
@@ -35,6 +38,9 @@ export default function ProfilePage() {
                 name: user.name || '',
                 email: user.email || '',
                 phone: user.phone || '',
+                department: user.department || '',
+                year: user.year ? String(user.year) : '',
+                hostel: user.hostel || '',
             });
             setProfilePicturePreview(user.profile_picture || '');
         }
@@ -59,6 +65,9 @@ export default function ProfilePage() {
             const formDataToSend = new FormData();
             formDataToSend.append('name', formData.name);
             formDataToSend.append('phone', formData.phone);
+            formDataToSend.append('department', formData.department);
+            formDataToSend.append('year', formData.year);
+            formDataToSend.append('hostel', formData.hostel);
 
             if (profilePicture) {
                 formDataToSend.append('profile_picture', profilePicture);
@@ -208,6 +217,35 @@ export default function ProfilePage() {
                                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                 disabled={!isEditing}
                             />
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <Input
+                                    label="Branch/Department"
+                                    type="text"
+                                    value={formData.department}
+                                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                                    disabled={!isEditing}
+                                    placeholder="e.g. CSE"
+                                />
+                                <Input
+                                    label="Year"
+                                    type="number"
+                                    value={formData.year}
+                                    onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                                    disabled={!isEditing}
+                                    placeholder="e.g. 2"
+                                    min={1}
+                                    max={5}
+                                />
+                                <Input
+                                    label="Hostel"
+                                    type="text"
+                                    value={formData.hostel}
+                                    onChange={(e) => setFormData({ ...formData, hostel: e.target.value })}
+                                    disabled={!isEditing}
+                                    placeholder="e.g. J"
+                                />
+                            </div>
 
                             {/* Account Info */}
                             <div className="border-t border-gray-200 pt-6">

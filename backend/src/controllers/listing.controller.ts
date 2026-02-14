@@ -144,7 +144,7 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
                     icon
                 )
             `, { count: 'exact' })
-            .eq('status', 'active');
+            .in('status', ['active', 'sold', 'rented']);
 
         // Apply filters
         if (category_id) {
@@ -153,6 +153,9 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
 
         if (listing_type) {
             query = query.eq('listing_type', listing_type);
+        } else {
+            // Default: only show sell and rent listings (exclude lost & found)
+            query = query.in('listing_type', ['sell', 'rent']);
         }
 
         if (condition) {
@@ -173,6 +176,9 @@ export const getAllListings = async (req: AuthRequest, res: Response): Promise<v
 
         // Apply sorting
         const ascending = sort_order === 'asc';
+
+        // Order by status first (active -> rented -> sold) so available items are prioritized
+        query = query.order('status', { ascending: true });
 
         // If sorting by price, sort with nulls last
         if (sort_by === 'price') {
@@ -242,7 +248,6 @@ export const getListingById = async (req: AuthRequest, res: Response): Promise<v
                     id,
                     name,
                     email,
-                    phone,
                     profile_picture,
                     trust_score,
                     created_at
@@ -284,7 +289,6 @@ export const getListingById = async (req: AuthRequest, res: Response): Promise<v
             images: parseImages(listing.images),
             seller_name: listing.users?.name,
             seller_email: listing.users?.email,
-            seller_phone: listing.users?.phone,
             seller_profile_picture: listing.users?.profile_picture,
             seller_trust_score: listing.users?.trust_score,
             category_name: listing.categories?.name,

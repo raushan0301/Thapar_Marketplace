@@ -9,19 +9,12 @@ import { handleApiError } from '@/lib/api';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useAuthStore } from '@/store/authStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated } = useAuthStore();
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, router]);
-
-
 
   const [listings, setListings] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -40,6 +33,21 @@ export default function HomePage() {
     totalPages: 1,
     totalListings: 0,
   });
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, router]);
+
+  // Sync filters from URL params
+  useEffect(() => {
+    const search = searchParams.get('search') || '';
+    setFilters(prev => {
+      if (prev.search === search) return prev;
+      return { ...prev, search };
+    });
+  }, [searchParams]);
 
   useEffect(() => {
     fetchCategories();

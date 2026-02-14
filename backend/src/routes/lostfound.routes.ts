@@ -6,6 +6,7 @@ import {
     updateLostFoundItem,
     markLostFoundResolved,
     getLostFoundCategories,
+    reactivateLostFoundItem,
 } from '../controllers/lostfound.controller';
 import { authenticate } from '../middleware/auth';
 import { uploadMultiple } from '../middleware/upload';
@@ -32,5 +33,8 @@ router.put('/:itemId', uploadMultiple, updateLostFoundItem);
 
 // Mark item as resolved (found/claimed)
 router.patch('/:itemId/resolve', markLostFoundResolved);
+
+// Reactivate item (move from history to active)
+router.patch('/:itemId/reactivate', reactivateLostFoundItem);
 
 export default router;

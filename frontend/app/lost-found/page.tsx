@@ -1,27 +1,39 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { lostFoundService, LostFoundItem } from '@/services/lostFoundService';
 import { useAuthStore } from '@/store/authStore';
-import { Search, MapPin, Calendar, Gift, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Search, MapPin, Calendar, Gift, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
 export default function LostFoundPage() {
     const router = useRouter();
-    const { isAuthenticated } = useAuthStore();
+    const searchParams = useSearchParams();
+    const { user, isAuthenticated } = useAuthStore();
     const [items, setItems] = useState<LostFoundItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'all' | 'lost' | 'found'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'lost' | 'found' | 'history'>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [locationFilter, setLocationFilter] = useState('');
+
+    // Sync URL search params to state
+    useEffect(() => {
+        const query = searchParams.get('search') || '';
+        setSearchQuery(query);
+    }, [searchParams]);
 
     useEffect(() => {
         if (!isAuthenticated) {
             router.push('/login');
             return;
         }
-        fetchItems();
-    }, [isAuthenticated, activeTab]);
+
+        const timeoutId = setTimeout(() => {
+            fetchItems();
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [isAuthenticated, activeTab, searchQuery, locationFilter]);
 
     const fetchItems = async () => {
         try {
@@ -31,8 +43,13 @@ export default function LostFoundPage() {
                 sort_order: 'desc',
             };
 
-            if (activeTab !== 'all') {
-                filters.listing_type = activeTab;
+            if (activeTab === 'history') {
+                filters.status = 'sold';
+            } else {
+                filters.status = 'active';
+                if (activeTab !== 'all') {
+                    filters.listing_type = activeTab;
+                }
             }
 
             if (searchQuery) {
@@ -60,6 +77,19 @@ export default function LostFoundPage() {
 
     const handleItemClick = (itemId: string) => {
         router.push(`/lost-found/${itemId}`);
+    };
+
+    const handleReactivateItem = async (e: React.MouseEvent, itemId: string) => {
+        e.stopPropagation();
+
+        try {
+            const response = await lostFoundService.reactivateItem(itemId);
+            if (response.success) {
+                fetchItems();
+            }
+        } catch (error) {
+            console.error('Reactivation failed:', error);
+        }
     };
 
     const formatDate = (dateString: string) => {
@@ -151,8 +181,8 @@ export default function LostFoundPage() {
                         <button
                             onClick={() => setActiveTab('all')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'all'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                 }`}
                         >
                             All Items
@@ -160,8 +190,8 @@ export default function LostFoundPage() {
                         <button
                             onClick={() => setActiveTab('lost')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'lost'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                 }`}
                         >
                             🔴 Lost
@@ -169,11 +199,20 @@ export default function LostFoundPage() {
                         <button
                             onClick={() => setActiveTab('found')}
                             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'found'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                 }`}
                         >
                             🟢 Found
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${activeTab === 'history'
+                                ? 'bg-gray-800 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                }`}
+                        >
+                            📜 History
                         </button>
                     </div>
                 </div>
@@ -225,11 +264,23 @@ export default function LostFoundPage() {
                                     )}
                                     {/* Badge */}
                                     <div
-                                        className={`absolute top-3 right-3 px-3 py-1 rounded-full text-white font-semibold text-xs ${item.listing_type === 'lost' ? 'bg-red-600' : 'bg-green-600'
+                                        className={`absolute top-3 right-3 px-3 py-1 rounded-full text-white font-semibold text-xs ${activeTab === 'history' ? 'bg-gray-600' :
+                                            item.listing_type === 'lost' ? 'bg-red-600' : 'bg-green-600'
                                             }`}
                                     >
-                                        {item.listing_type === 'lost' ? 'LOST' : 'FOUND'}
+                                        {activeTab === 'history' ? 'RESOLVED' : item.listing_type === 'lost' ? 'LOST' : 'FOUND'}
                                     </div>
+
+                                    {/* Reactivate Button */}
+                                    {activeTab === 'history' && user?.id === item.user_id && (
+                                        <button
+                                            onClick={(e) => handleReactivateItem(e, item.id)}
+                                            className="absolute bottom-3 right-3 bg-blue-600 text-white p-2 rounded-full shadow-lg hover:bg-blue-700 transition-colors z-10"
+                                            title="Reactivate Item"
+                                        >
+                                            <RefreshCw size={16} />
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Content */}

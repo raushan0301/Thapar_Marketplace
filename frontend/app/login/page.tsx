@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/services/authService';
@@ -12,13 +12,19 @@ import { handleApiError } from '@/lib/api';
 
 export default function LoginPage() {
     const router = useRouter();
-    const setAuth = useAuthStore((state) => state.setAuth);
+    const { setAuth, isAuthenticated } = useAuthStore();
     const [formData, setFormData] = useState({
         email: '',
         password: '',
     });
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            router.push('/');
+        }
+    }, [isAuthenticated, router]);
 
     const validate = () => {
         const newErrors: { email?: string; password?: string } = {};

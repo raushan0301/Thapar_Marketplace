@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { lostFoundService, LostFoundItem } from '@/services/lostFoundService';
 import { useAuthStore } from '@/store/authStore';
-import { ArrowLeft, MapPin, Calendar, Gift, Eye, MessageCircle, CheckCircle, Phone, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Gift, Eye, MessageCircle, CheckCircle, Mail, User as UserIcon, RefreshCw } from 'lucide-react';
+
 
 export default function LostFoundDetailPage() {
     const router = useRouter();
@@ -45,22 +46,34 @@ export default function LostFoundDetailPage() {
     const handleMarkResolved = async () => {
         if (!item) return;
 
-        const confirmMessage = item.listing_type === 'lost'
-            ? 'Mark this item as found? This will remove it from active listings.'
-            : 'Mark this item as claimed? This will remove it from active listings.';
-
-        if (!confirm(confirmMessage)) return;
-
         try {
             setResolving(true);
             const response = await lostFoundService.markResolved(item.id);
             if (response.success) {
-                alert(`Item marked as ${item.listing_type === 'lost' ? 'found' : 'claimed'}!`);
+                // alert(`Item marked as ${item.listing_type === 'lost' ? 'found' : 'claimed'}!`);
                 router.push('/lost-found');
             }
         } catch (error) {
             console.error('Failed to mark resolved:', error);
-            alert('Failed to update item status');
+            // alert('Failed to update item status');
+        } finally {
+            setResolving(false);
+        }
+    };
+
+    const handleReactivate = async () => {
+        if (!item) return;
+
+        try {
+            setResolving(true);
+            const response = await lostFoundService.reactivateItem(item.id);
+            if (response.success) {
+                // alert('Item reactivated successfully!');
+                setItem({ ...item, status: 'active' });
+            }
+        } catch (error) {
+            console.error('Failed to reactivate:', error);
+            // alert('Failed to reactivate item');
         } finally {
             setResolving(false);
         }
@@ -68,8 +81,8 @@ export default function LostFoundDetailPage() {
 
     const handleContactPoster = () => {
         if (!item) return;
-        // Navigate to messages with this user
-        router.push(`/messages?userId=${item.user_id}&listingId=${item.id}`);
+        // Navigate to messages/chat with this user about this item
+        router.push(`/messages?user=${item.user_id}&listing=${item.id}`);
     };
 
     const formatDate = (dateString: string) => {
@@ -115,9 +128,10 @@ export default function LostFoundDetailPage() {
                     {/* Left Column - Images and Details */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Status Badge */}
-                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold text-sm ${isLost ? 'bg-red-600' : 'bg-green-600'
+                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-semibold text-sm ${item.status === 'sold' ? 'bg-gray-600' :
+                            isLost ? 'bg-red-600' : 'bg-green-600'
                             }`}>
-                            {isLost ? '🔴 LOST ITEM' : '🟢 FOUND ITEM'}
+                            {item.status === 'sold' ? 'RESOLVED' : isLost ? '🔴 LOST ITEM' : '🟢 FOUND ITEM'}
                         </div>
 
                         {/* Images */}
@@ -259,11 +273,11 @@ export default function LostFoundDetailPage() {
                                 </div>
 
                                 {/* Contact Information */}
-                                {!isOwner && item.poster_phone && (
+                                {!isOwner && item.poster_email && (
                                     <div className="pt-4 border-t border-gray-200">
                                         <div className="flex items-center gap-2 text-gray-700 text-sm">
-                                            <Phone size={16} className="text-gray-400" />
-                                            <span>{item.poster_phone}</span>
+                                            <Mail size={16} className="text-gray-400" />
+                                            <span>{item.poster_email}</span>
                                         </div>
                                     </div>
                                 )}
@@ -272,26 +286,42 @@ export default function LostFoundDetailPage() {
                             {/* Action Buttons */}
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 space-y-3">
                                 {isOwner ? (
-                                    <>
-                                        <button
-                                            onClick={handleMarkResolved}
-                                            disabled={resolving}
-                                            className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium text-white transition-all ${isLost
-                                                ? 'bg-green-600 hover:bg-green-700'
-                                                : 'bg-blue-600 hover:bg-blue-700'
-                                                } ${resolving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        >
-                                            <CheckCircle size={20} />
-                                            {resolving
-                                                ? 'Updating...'
-                                                : isLost
-                                                    ? 'Mark as Found'
-                                                    : 'Mark as Claimed'}
-                                        </button>
-                                        <p className="text-xs text-gray-500 text-center">
-                                            This will remove the item from active listings
-                                        </p>
-                                    </>
+                                    item.status === 'sold' ? (
+                                        <>
+                                            <button
+                                                onClick={handleReactivate}
+                                                disabled={resolving}
+                                                className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium text-white transition-all bg-blue-600 hover:bg-blue-700"
+                                            >
+                                                <RefreshCw size={20} />
+                                                {resolving ? 'Reactivating...' : 'Reactivate Item'}
+                                            </button>
+                                            <p className="text-xs text-gray-500 text-center">
+                                                Move back to active listings
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={handleMarkResolved}
+                                                disabled={resolving}
+                                                className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium text-white transition-all ${isLost
+                                                    ? 'bg-green-600 hover:bg-green-700'
+                                                    : 'bg-blue-600 hover:bg-blue-700'
+                                                    } ${resolving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                <CheckCircle size={20} />
+                                                {resolving
+                                                    ? 'Updating...'
+                                                    : isLost
+                                                        ? 'Mark as Found'
+                                                        : 'Mark as Claimed'}
+                                            </button>
+                                            <p className="text-xs text-gray-500 text-center">
+                                                This will remove the item from active listings
+                                            </p>
+                                        </>
+                                    )
                                 ) : (
                                     <>
                                         <button

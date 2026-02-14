@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api`;
 
 export interface LostFoundItem {
     id: string;
@@ -20,7 +20,7 @@ export interface LostFoundItem {
     poster_name?: string;
     poster_profile_picture?: string;
     poster_trust_score?: number;
-    poster_phone?: string;
+    poster_email?: string;
     category_name?: string;
     category_icon?: string;
 }
@@ -34,6 +34,7 @@ export interface LostFoundFilters {
     sort_order?: 'asc' | 'desc';
     page?: number;
     limit?: number;
+    status?: string;
 }
 
 export const lostFoundService = {
@@ -102,6 +103,22 @@ export const lostFoundService = {
         const token = localStorage.getItem('token');
         const response = await axios.patch(
             `${API_URL}/lost-found/${itemId}/resolve`,
+            {},
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+
+        return response.data;
+    },
+
+    // Reactivate lost/found item
+    async reactivateItem(itemId: string) {
+        const token = localStorage.getItem('token');
+        const response = await axios.patch(
+            `${API_URL}/lost-found/${itemId}/reactivate`,
             {},
             {
                 headers: {

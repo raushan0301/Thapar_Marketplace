@@ -40,10 +40,6 @@ export default function CreateLostFoundPage() {
             const response = await lostFoundService.getCategories();
             if (response.success) {
                 setCategories(response.data.categories || []);
-                // Set default category if available
-                if (response.data.categories?.length > 0) {
-                    setFormData(prev => ({ ...prev, category_id: response.data.categories[0].id }));
-                }
             }
         } catch (error) {
             console.error('Failed to fetch categories:', error);
@@ -148,8 +144,8 @@ export default function CreateLostFoundPage() {
                         <button
                             onClick={() => setListingType('lost')}
                             className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all text-sm ${listingType === 'lost'
-                                    ? 'bg-red-600 text-white'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                ? 'bg-red-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                 }`}
                         >
                             🔴 I Lost Something
@@ -157,8 +153,8 @@ export default function CreateLostFoundPage() {
                         <button
                             onClick={() => setListingType('found')}
                             className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all text-sm ${listingType === 'found'
-                                    ? 'bg-green-600 text-white'
-                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                ? 'bg-green-600 text-white'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                 }`}
                         >
                             🟢 I Found Something
@@ -213,6 +209,7 @@ export default function CreateLostFoundPage() {
                             className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
                             required
                         >
+                            <option value="">Select a category</option>
                             {categories.map(cat => (
                                 <option key={cat.id} value={cat.id}>
                                     {cat.icon} {cat.name}
@@ -329,8 +326,8 @@ export default function CreateLostFoundPage() {
                             type="submit"
                             disabled={loading}
                             className={`flex-1 px-6 py-2.5 rounded-lg font-medium text-white transition-all text-sm ${listingType === 'lost'
-                                    ? 'bg-red-600 hover:bg-red-700'
-                                    : 'bg-green-600 hover:bg-green-700'
+                                ? 'bg-red-600 hover:bg-red-700'
+                                : 'bg-green-600 hover:bg-green-700'
                                 } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             {loading ? 'Posting...' : `Post ${listingType === 'lost' ? 'Lost' : 'Found'} Item`}

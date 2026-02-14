@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button';
 import socketService from '@/lib/socket';
 import toast from 'react-hot-toast';
 import { handleApiError } from '@/lib/api';
-import { Send, MessageSquare, ArrowLeft } from 'lucide-react';
+import { Send, MessageSquare, ArrowLeft, X, Mail, Phone, Building, Home } from 'lucide-react';
 import { eventBus } from '@/lib/eventBus';
 
 function MessagesContent() {
@@ -25,6 +25,25 @@ function MessagesContent() {
     const [isSending, setIsSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [profileDetails, setProfileDetails] = useState<any>(null);
+    const [loadingProfile, setLoadingProfile] = useState(false);
+
+    const handleViewProfile = async () => {
+        if (!selectedConversation) return;
+        setShowProfileModal(true);
+        setLoadingProfile(true);
+        try {
+            const result = await authService.getUserPublicDetails(selectedConversation.other_user_id);
+            if (result.success) {
+                setProfileDetails(result.data.user);
+            }
+        } catch (error) {
+            console.error('Failed to fetch user details:', error);
+        } finally {
+            setLoadingProfile(false);
+        }
+    };
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -258,6 +277,18 @@ function MessagesContent() {
         });
     };
 
+    const isSameDay = (d1: string, d2: string) => {
+        return new Date(d1).toDateString() === new Date(d2).toDateString();
+    };
+
+    const formatDateSeparator = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-GB', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short'
+        });
+    };
+
     return (
         <div className="h-[calc(100vh-4rem)] bg-gray-50">
             <div className="max-w-7xl mx-auto h-full">
@@ -267,7 +298,14 @@ function MessagesContent() {
                         className={`${selectedConversation ? 'hidden md:block' : 'block'
                             } w-full md:w-80 bg-white border-r border-gray-200 flex flex-col`}
                     >
-                        <div className="p-4 border-b border-gray-200">
+                        <div className="p-4 border-b border-gray-200 flex items-center gap-3">
+                            <button
+                                onClick={() => router.back()}
+                                className="text-gray-500 hover:text-gray-900 transition-colors p-1 -ml-1 rounded-full hover:bg-gray-100"
+                                title="Go Back"
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
                             <h2 className="text-xl font-semibold text-gray-900">Messages</h2>
                         </div>
 
@@ -314,7 +352,7 @@ function MessagesContent() {
                                 conversations.map((conv) => (
                                     <button
                                         key={conv.other_user_id}
-                                        onClick={() => handleSelectConversation(conv)}
+                                        onClick={() => router.push(`/messages?user=${conv.other_user_id}`)}
                                         className={`w-full p-4 flex items-center hover:bg-gray-50 transition-colors ${selectedConversation?.other_user_id === conv.other_user_id
                                             ? 'bg-blue-50'
                                             : ''
@@ -364,45 +402,65 @@ function MessagesContent() {
                                 {/* Chat Header */}
                                 <div className="p-4 border-b border-gray-200 flex items-center">
                                     <button
-                                        onClick={() => setSelectedConversation(null)}
+                                        onClick={() => {
+                                            setSelectedConversation(null);
+                                            router.push('/messages');
+                                        }}
                                         className="md:hidden mr-3"
                                     >
                                         <ArrowLeft size={24} />
                                     </button>
-                                    {selectedConversation.other_user_picture ? (
-                                        <img
-                                            src={selectedConversation.other_user_picture}
-                                            alt={selectedConversation.other_user_name}
-                                            className="w-10 h-10 rounded-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                            <span className="text-blue-600 font-semibold">
-                                                {selectedConversation.other_user_name?.charAt(0).toUpperCase()}
-                                            </span>
+
+                                    <div
+                                        className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={handleViewProfile}
+                                    >
+                                        {selectedConversation.other_user_picture ? (
+                                            <img
+                                                src={selectedConversation.other_user_picture}
+                                                alt={selectedConversation.other_user_name}
+                                                className="w-10 h-10 rounded-full object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                                <span className="text-blue-600 font-semibold">
+                                                    {selectedConversation.other_user_name?.charAt(0).toUpperCase()}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="ml-3">
+                                            <p className="font-semibold text-gray-900 hover:underline">
+                                                {selectedConversation.other_user_name}
+                                            </p>
                                         </div>
-                                    )}
-                                    <div className="ml-3">
-                                        <p className="font-semibold text-gray-900">
-                                            {selectedConversation.other_user_name}
-                                        </p>
                                     </div>
                                 </div>
 
                                 {/* Messages */}
                                 <div className="flex-grow overflow-y-auto p-4 bg-gray-50">
-                                    {messages.map((message) => (
-                                        <MessageBubble
-                                            key={message.id}
-                                            message={message}
-                                            isOwnMessage={message.sender_id === user?.id}
-                                            senderName={
-                                                message.sender_id !== user?.id
-                                                    ? selectedConversation.other_user_name
-                                                    : undefined
-                                            }
-                                        />
-                                    ))}
+                                    {messages.map((message, index) => {
+                                        const showDate = index === 0 || !isSameDay(message.created_at, messages[index - 1].created_at);
+                                        return (
+                                            <React.Fragment key={message.id}>
+                                                {showDate && (
+                                                    <div className="flex justify-center my-4 sticky top-0 z-10">
+                                                        <span className="bg-gray-200/90 backdrop-blur-sm text-gray-600 text-xs px-3 py-1 rounded-lg font-medium shadow-sm">
+                                                            {formatDateSeparator(message.created_at)}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                <MessageBubble
+                                                    message={message}
+                                                    isOwnMessage={message.sender_id === user?.id}
+                                                    senderName={
+                                                        message.sender_id !== user?.id
+                                                            ? selectedConversation.other_user_name
+                                                            : undefined
+                                                    }
+                                                />
+                                            </React.Fragment>
+                                        );
+                                    })}
                                     <div ref={messagesEndRef} />
                                 </div>
 
@@ -433,6 +491,81 @@ function MessagesContent() {
                     </div>
                 </div>
             </div>
+
+            {/* Profile Modal */}
+            {showProfileModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowProfileModal(false)}>
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="bg-blue-600 h-24 relative">
+                            <button onClick={() => setShowProfileModal(false)} className="absolute top-4 right-4 text-white hover:bg-white/20 rounded-full p-1 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="px-6 pb-6 pt-16 relative text-center">
+                            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2">
+                                {profileDetails?.profile_picture ? (
+                                    <img src={profileDetails.profile_picture} alt={profileDetails.name} className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover bg-white" />
+                                ) : (
+                                    <div className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-blue-100 flex items-center justify-center text-3xl text-blue-600 font-bold">
+                                        {profileDetails?.name?.charAt(0) || selectedConversation?.other_user_name?.charAt(0)}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-2">
+                                <h2 className="text-2xl font-bold text-gray-900">{profileDetails?.name || selectedConversation?.other_user_name}</h2>
+                                <p className="text-gray-500 text-sm">Thapar University</p>
+
+                                {loadingProfile ? (
+                                    <div className="mt-8 flex justify-center py-4"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
+                                ) : (
+                                    <div className="mt-6 space-y-3 inline-block text-left w-full max-w-xs mx-auto">
+                                        {profileDetails?.email && (
+                                            <div className="flex items-center text-gray-600 group bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors shrink-0">
+                                                    <Mail size={16} className="text-blue-600" />
+                                                </div>
+                                                <span className="text-sm truncate">{profileDetails.email}</span>
+                                            </div>
+                                        )}
+                                        {profileDetails?.phone && (
+                                            <div className="flex items-center text-gray-600 group bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mr-3 group-hover:bg-green-200 transition-colors shrink-0">
+                                                    <Phone size={16} className="text-green-600" />
+                                                </div>
+                                                <span className="text-sm">{profileDetails.phone}</span>
+                                            </div>
+                                        )}
+                                        {profileDetails?.department && (
+                                            <div className="flex items-center text-gray-600 group bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                                <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center mr-3 group-hover:bg-purple-200 transition-colors shrink-0">
+                                                    <Building size={16} className="text-purple-600" />
+                                                </div>
+                                                <span className="text-sm">{profileDetails.department} {profileDetails.year ? `(${profileDetails.year} Year)` : ''}</span>
+                                            </div>
+                                        )}
+                                        {profileDetails?.hostel && (
+                                            <div className="flex items-center text-gray-600 group bg-gray-50 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                                                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center mr-3 group-hover:bg-orange-200 transition-colors shrink-0">
+                                                    <Home size={16} className="text-orange-600" />
+                                                </div>
+                                                <span className="text-sm">{profileDetails.hostel} Hostel</span>
+                                            </div>
+                                        )}
+
+                                        <div className="pt-4 mt-6 border-t border-gray-100 flex justify-center">
+                                            <p className="text-xs text-gray-400">
+                                                Member since {new Date(profileDetails?.created_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -71,7 +71,7 @@ app.use(express.urlencoded({ extended: true }));
 // Rate limiting
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '55000'), // Increased for development
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5800000'), // Increased for testing
     message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/api/', limiter);

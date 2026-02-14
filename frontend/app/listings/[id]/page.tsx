@@ -31,6 +31,7 @@ export default function ListingDetailPage() {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
     const hasFetchedRef = React.useRef(false);
 
@@ -63,6 +64,22 @@ export default function ListingDetailPage() {
             }
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleStatusUpdate = async (newStatus: string) => {
+        setIsUpdatingStatus(true);
+        try {
+            const result = await listingService.markListingStatus(listing.id, newStatus);
+            if (result.success) {
+                toast.success(`Listing marked as ${newStatus}`);
+                setListing({ ...listing, status: newStatus });
+            }
+        } catch (error: any) {
+            const errorMessage = handleApiError(error);
+            toast.error(errorMessage);
+        } finally {
+            setIsUpdatingStatus(false);
         }
     };
 
@@ -333,8 +350,15 @@ export default function ListingDetailPage() {
                     <div className="lg:col-span-1">
                         <div className="bg-white rounded-lg shadow-md p-6 sticky top-20">
                             {/* Title & Price */}
-                            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+                            <h1 className="text-2xl font-bold text-gray-900 mb-4 flex flex-wrap items-center gap-3">
                                 {listing.title}
+                                {listing.status !== 'active' && (
+                                    <span className={`px-3 py-1 rounded-full text-sm font-bold text-white ${listing.status === 'sold' ? 'bg-red-500' :
+                                            listing.status === 'rented' ? 'bg-orange-500' : 'bg-gray-600'
+                                        }`}>
+                                        {listing.status.toUpperCase()}
+                                    </span>
+                                )}
                             </h1>
 
                             {listing.price && (
@@ -380,6 +404,25 @@ export default function ListingDetailPage() {
                             {/* Action Buttons */}
                             {isOwner ? (
                                 <div className="flex flex-col gap-4">
+                                    {listing.status === 'active' ? (
+                                        <Button
+                                            variant="secondary"
+                                            className="w-full flex items-center justify-center"
+                                            onClick={() => handleStatusUpdate('sold')}
+                                            isLoading={isUpdatingStatus}
+                                        >
+                                            Mark as Sold
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="secondary"
+                                            className="w-full flex items-center justify-center"
+                                            onClick={() => handleStatusUpdate('active')}
+                                            isLoading={isUpdatingStatus}
+                                        >
+                                            Mark as Active
+                                        </Button>
+                                    )}
                                     <Link href={`/listings/edit/${listing.id}`}>
                                         <Button className="w-full flex items-center justify-center">
                                             <Edit size={18} className="mr-2" />

@@ -17,6 +17,7 @@ export default function MyListingsPage() {
     const [listings, setListings] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<string>('all');
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -25,17 +26,12 @@ export default function MyListingsPage() {
             return;
         }
         fetchMyListings();
-    }, [isAuthenticated, activeTab, router]);
+    }, [isAuthenticated, router]);
 
     const fetchMyListings = async () => {
         setIsLoading(true);
         try {
-            const params: any = {};
-            if (activeTab !== 'all') {
-                params.status = activeTab;
-            }
-
-            const result = await listingService.getMyListings(params);
+            const result = await listingService.getMyListings({ limit: 100 });
 
             if (result.success) {
                 setListings(result.data.listings);
@@ -45,6 +41,24 @@ export default function MyListingsPage() {
             toast.error(errorMessage);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleStatusUpdate = async (listingId: string, newStatus: string) => {
+        setActionLoading(listingId);
+        try {
+            const result = await listingService.markListingStatus(listingId, newStatus);
+            if (result.success) {
+                toast.success(`Listing marked as ${newStatus}`);
+                setListings(prev =>
+                    prev.map(l => l.id === listingId ? { ...l, status: newStatus } : l)
+                );
+            }
+        } catch (error: any) {
+            const errorMessage = handleApiError(error);
+            toast.error(errorMessage);
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -66,6 +80,10 @@ export default function MyListingsPage() {
             count: listings.filter((l) => l.status === 'expired').length,
         },
     ];
+
+    const filteredListings = activeTab === 'all'
+        ? listings
+        : listings.filter(l => l.status === activeTab);
 
     return (
         <div className="min-h-screen bg-gray-50 py-8">
@@ -92,8 +110,8 @@ export default function MyListingsPage() {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`px-6 py-4 font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
-                                        ? 'border-b-2 border-blue-600 text-blue-600'
-                                        : 'text-gray-600 hover:text-gray-900'
+                                    ? 'border-b-2 border-blue-600 text-blue-600'
+                                    : 'text-gray-600 hover:text-gray-900'
                                     }`}
                             >
                                 {tab.label}
@@ -140,16 +158,33 @@ export default function MyListingsPage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {listings.map((listing) => (
-                            <div key={listing.id} className="relative">
-                                <ListingCard listing={listing} />
-                                {listing.status !== 'active' && (
-                                    <div className="absolute top-2 right-2">
-                                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-800 text-white">
-                                            {listing.status.toUpperCase()}
-                                        </span>
-                                    </div>
-                                )}
+                        {filteredListings.map((listing) => (
+                            <div key={listing.id} className="flex flex-col">
+                                <div className="relative">
+                                    <ListingCard listing={listing} />
+
+                                </div>
+                                <div className="mt-3">
+                                    {listing.status === 'active' ? (
+                                        <Button
+                                            variant="secondary"
+                                            className="w-full"
+                                            onClick={() => handleStatusUpdate(listing.id, 'sold')}
+                                            isLoading={actionLoading === listing.id}
+                                        >
+                                            Mark as Sold
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="secondary"
+                                            className="w-full"
+                                            onClick={() => handleStatusUpdate(listing.id, 'active')}
+                                            isLoading={actionLoading === listing.id}
+                                        >
+                                            Mark as Active
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         ))}
                     </div>
