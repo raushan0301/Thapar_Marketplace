@@ -77,6 +77,14 @@ class SocketService {
         }
     }
 
+    // Listen for message read status updates
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onMessageRead(callback: (data: any) => void): void {
+        if (this.socket) {
+            this.socket.on('message_read', callback);
+        }
+    }
+
     // Remove all listeners
     removeAllListeners(): void {
         if (this.socket) {

@@ -70,10 +70,19 @@ function MessagesContent() {
 
         fetchConversations();
 
+        // Track processed message IDs to prevent duplicates from multiple Socket.IO channels
+        const processedMessageIds = new Set<string>();
+
         // Listen for new messages - use refs to avoid stale closure
         socketService.onNewMessage((data) => {
             const currentConversation = selectedConversationRef.current;
             const currentUser = userRef.current;
+
+            // Prevent duplicate processing (backend emits to 4 channels)
+            if (processedMessageIds.has(data.id)) {
+                return;
+            }
+            processedMessageIds.add(data.id);
 
             // Update messages if this message belongs to the currently selected conversation
             if (
@@ -90,6 +99,11 @@ function MessagesContent() {
                     return [...prev, data];
                 });
                 scrollToBottom();
+
+                // If we received a message in the active chat, mark it as read immediately
+                if (data.receiver_id === currentUser?.id) {
+                    messageService.markConversationAsRead(currentConversation.other_user_id);
+                }
             }
 
             // Update conversations list to show new message
@@ -125,8 +139,26 @@ function MessagesContent() {
             });
 
             // Emit event to update navbar unread count if message is for current user
-            if (data.receiver_id === currentUser?.id) {
+            // BUT only if it's NOT the currently active conversation
+            if (data.receiver_id === currentUser?.id &&
+                currentConversation?.other_user_id !== data.sender_id) {
                 eventBus.emit('unreadCountUpdated');
+            }
+        });
+
+        // Listen for message read status updates
+        socketService.onMessageRead((data: { messageIds: string[], conversationUserId: string }) => {
+            const currentConversation = selectedConversationRef.current;
+
+            // Update messages if this is the current conversation
+            if (currentConversation?.other_user_id === data.conversationUserId) {
+                setMessages((prev) =>
+                    prev.map(msg =>
+                        data.messageIds.includes(msg.id)
+                            ? { ...msg, is_read: true }
+                            : msg
+                    )
+                );
             }
         });
 

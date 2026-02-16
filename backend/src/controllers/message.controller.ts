@@ -56,18 +56,12 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
             return;
         }
 
-        // Emit socket event to BOTH users via multiple channels for guaranteed delivery
-        // 1. Emit to receiver's personal room
+        // Emit socket event to BOTH users via their personal rooms
+        // Personal rooms are more reliable since users join them on connection
         io.to(`user_${receiver_id}`).emit('new_message', message);
-
-        // 2. Emit to sender's personal room (for multi-device sync)
         io.to(`user_${senderId}`).emit('new_message', message);
 
-        // 3. Emit to both possible chat room formats
-        io.to(`chat_${senderId}_${receiver_id}`).emit('new_message', message);
-        io.to(`chat_${receiver_id}_${senderId}`).emit('new_message', message);
-
-        console.log(`✅ Message emitted to user_${receiver_id}, user_${senderId}, and chat rooms`);
+        console.log(`✅ Message emitted to user_${receiver_id} and user_${senderId}`);
 
         res.status(201).json({
             success: true,
@@ -401,6 +395,16 @@ export const markConversationAsRead = async (req: AuthRequest, res: Response): P
         }
 
         console.log(`✅ Marked ${messages?.length || 0} messages as read`);
+
+        // Emit Socket.IO event to sender to update read status in real-time
+        if (messages && messages.length > 0) {
+            const messageIds = messages.map((msg: any) => msg.id);
+            // Notify the sender that their messages have been read
+            io.to(`user_${otherUserId}`).emit('message_read', {
+                messageIds,
+                conversationUserId: userId,
+            });
+        }
 
         res.status(200).json({
             success: true,
