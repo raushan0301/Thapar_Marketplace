@@ -56,8 +56,18 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
             return;
         }
 
-        // Emit socket event to receiver
+        // Emit socket event to BOTH users via multiple channels for guaranteed delivery
+        // 1. Emit to receiver's personal room
         io.to(`user_${receiver_id}`).emit('new_message', message);
+
+        // 2. Emit to sender's personal room (for multi-device sync)
+        io.to(`user_${senderId}`).emit('new_message', message);
+
+        // 3. Emit to both possible chat room formats
+        io.to(`chat_${senderId}_${receiver_id}`).emit('new_message', message);
+        io.to(`chat_${receiver_id}_${senderId}`).emit('new_message', message);
+
+        console.log(`✅ Message emitted to user_${receiver_id}, user_${senderId}, and chat rooms`);
 
         res.status(201).json({
             success: true,

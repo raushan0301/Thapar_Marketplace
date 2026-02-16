@@ -137,15 +137,35 @@ app.use('/api/lost-found', lostFoundRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
+    console.log(`🔌 Socket connected: ${socket.id}`);
 
+    // Join user's personal room (for receiving messages even when not in specific chat)
+    const userId = (socket.handshake.auth as any)?.token
+        ? (() => {
+            try {
+                const decoded = jwt.decode((socket.handshake.auth as any).token) as any;
+                return decoded?.userId;
+            } catch {
+                return null;
+            }
+        })()
+        : null;
+
+    if (userId) {
+        socket.join(`user_${userId}`);
+        console.log(`👤 User ${userId} joined personal room`);
+    }
 
     // Join a chat room
     socket.on('join_chat', (chatId: string) => {
         socket.join(chatId);
+        console.log(`💬 Socket ${socket.id} joined chat: ${chatId}`);
     });
 
     // Send message
     socket.on('send_message', (data) => {
+        console.log(`📨 Message sent to chat: ${data.chatId}`);
+        // Emit to the specific chat room
         io.to(data.chatId).emit('new_message', data);
     });
 
@@ -156,6 +176,7 @@ io.on('connection', (socket) => {
 
     // Disconnect
     socket.on('disconnect', () => {
+        console.log(`🔌 Socket disconnected: ${socket.id}`);
     });
 });
 

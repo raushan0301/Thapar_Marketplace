@@ -47,6 +47,15 @@ function MessagesContent() {
         }
     };
 
+    // Use refs to avoid stale closures in Socket.IO listeners
+    const selectedConversationRef = useRef(selectedConversation);
+    const userRef = useRef(user);
+
+    useEffect(() => {
+        selectedConversationRef.current = selectedConversation;
+        userRef.current = user;
+    }, [selectedConversation, user]);
+
     useEffect(() => {
         if (!isAuthenticated) {
             toast.error('Please login to view messages');
@@ -61,18 +70,64 @@ function MessagesContent() {
 
         fetchConversations();
 
-        // Listen for new messages
+        // Listen for new messages - use refs to avoid stale closure
         socketService.onNewMessage((data) => {
+            const currentConversation = selectedConversationRef.current;
+            const currentUser = userRef.current;
+
+            // Update messages if this message belongs to the currently selected conversation
             if (
-                selectedConversation &&
-                (data.sender_id === selectedConversation.other_user_id ||
-                    data.receiver_id === selectedConversation.other_user_id)
+                currentConversation &&
+                currentUser &&
+                (data.sender_id === currentConversation.other_user_id ||
+                    data.receiver_id === currentConversation.other_user_id)
             ) {
-                setMessages((prev) => [...prev, data]);
+                setMessages((prev) => {
+                    // Avoid duplicates
+                    if (prev.some(msg => msg.id === data.id)) {
+                        return prev;
+                    }
+                    return [...prev, data];
+                });
                 scrollToBottom();
             }
-            // Refresh conversations to update last message
-            fetchConversations();
+
+            // Update conversations list to show new message
+            setConversations((prevConvs) => {
+                const otherUserId = data.sender_id === currentUser?.id ? data.receiver_id : data.sender_id;
+
+                // Check if conversation already exists
+                const existingConvIndex = prevConvs.findIndex(
+                    (conv) => conv.other_user_id === otherUserId
+                );
+
+                if (existingConvIndex !== -1) {
+                    // Update existing conversation
+                    const updatedConvs = [...prevConvs];
+                    updatedConvs[existingConvIndex] = {
+                        ...updatedConvs[existingConvIndex],
+                        last_message: data.message,
+                        last_message_time: data.created_at,
+                        unread_count:
+                            data.sender_id !== currentUser?.id &&
+                                currentConversation?.other_user_id !== otherUserId
+                                ? (updatedConvs[existingConvIndex].unread_count || 0) + 1
+                                : updatedConvs[existingConvIndex].unread_count,
+                    };
+                    // Move to top
+                    const [updated] = updatedConvs.splice(existingConvIndex, 1);
+                    return [updated, ...updatedConvs];
+                } else {
+                    // New conversation - fetch conversations to get full details
+                    fetchConversations();
+                    return prevConvs;
+                }
+            });
+
+            // Emit event to update navbar unread count if message is for current user
+            if (data.receiver_id === currentUser?.id) {
+                eventBus.emit('unreadCountUpdated');
+            }
         });
 
         return () => {
