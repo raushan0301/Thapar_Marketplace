@@ -34,12 +34,17 @@ const getOrigin = () => {
 
     const origins = frontendUrl.split(',').map(url => url.trim());
     return (origin: string | undefined, callback: (err: Error | null, origin?: boolean | string | RegExp | (string | RegExp)[]) => void) => {
-        if (!origin || origins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.warn(`Blocked CORS request from origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+
+        // Allow configured origins
+        if (origins.includes(origin)) return callback(null, true);
+
+        // Allow Vercel preview deployments
+        if (origin.endsWith('.vercel.app')) return callback(null, true);
+
+        console.warn(`Blocked CORS request from origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
     };
 };
 

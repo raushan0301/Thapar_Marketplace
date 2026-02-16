@@ -1,7 +1,18 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import dns from 'dns';
 
 dotenv.config();
+
+// Fix for Render/Cloud: Force Node to prefer IPv4 first
+// This prevents ENETUNREACH errors when the environment attempts IPv6 connection to Gmail
+try {
+    if (dns.setDefaultResultOrder) {
+        dns.setDefaultResultOrder('ipv4first');
+    }
+} catch (e) {
+    console.warn('Could not set default result order to ipv4first');
+}
 
 // Create a transporter using Gmail SMTP
 const transporter = nodemailer.createTransport({
