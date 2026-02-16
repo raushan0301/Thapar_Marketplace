@@ -1,4 +1,5 @@
 import resend from '../config/email';
+import transporter from '../config/nodemailer';
 
 interface EmailOptions {
   to: string;
@@ -8,6 +9,7 @@ interface EmailOptions {
 
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
+    // Attempt 1: Try Resend (Primary - High Quality)
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || 'ThaparMarket <onboarding@resend.dev>',
       to: options.to,
@@ -16,14 +18,36 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
     });
 
     if (error) {
-      console.error('❌ Error sending email:', error);
-      throw new Error(error.message);
+      console.warn(`⚠️ Resend failed: ${error.message}. Attempting backup...`);
+      throw new Error(error.message); // Trigger catch block for backup
     }
 
+    console.log(`✅ Email sent via Resend to ${options.to}`);
 
-  } catch (error) {
-    console.error('❌ Error sending email:', error);
-    throw new Error('Failed to send email');
+  } catch (resendError) {
+    // Attempt 2: Try Gmail (Backup - High Availability)
+    try {
+      console.log('🔄 Switching to Gmail Backup...');
+
+      if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+        throw new Error('Gmail credentials missing in .env');
+      }
+
+      await transporter.sendMail({
+        from: `ThaparMarket <${process.env.GMAIL_USER}>`,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      });
+
+      console.log(`✅ Email sent via Gmail Backup to ${options.to}`);
+
+    } catch (gmailError: any) {
+      console.error('❌ Both Email Services Failed!');
+      console.error('Resend Error:', resendError);
+      console.error('Gmail Error:', gmailError.message);
+      throw new Error('Failed to send email via both providers');
+    }
   }
 };
 
