@@ -355,12 +355,13 @@ function MessagesContent() {
         const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
         if (diffInHours < 24) {
-            return date.toLocaleTimeString('en-US', {
+            return date.toLocaleTimeString('en-IN', {
                 hour: '2-digit',
                 minute: '2-digit',
+                hour12: true,
             });
         }
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString('en-IN', {
             month: 'short',
             day: 'numeric',
         });
