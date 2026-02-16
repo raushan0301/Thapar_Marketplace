@@ -314,32 +314,51 @@ function MessagesContent() {
 
         if (!newMessage.trim() || !selectedConversation) return;
 
-        setIsSending(true);
+        // Optimistic update: Show message immediately
+        const tempId = `temp-${Date.now()}`;
+        const tempMessage = {
+            id: tempId,
+            sender_id: user?.id,
+            receiver_id: selectedConversation.other_user_id,
+            message: newMessage,
+            created_at: new Date().toISOString(),
+            is_read: false,
+            listing_id: searchParams.get('listing') || undefined,
+        };
+
+        setMessages((prev) => [...prev, tempMessage]);
+        setNewMessage('');
+        scrollToBottom();
 
         try {
             const result = await messageService.sendMessage({
                 receiver_id: selectedConversation.other_user_id,
-                message: newMessage,
-                listing_id: searchParams.get('listing') || undefined,
+                message: tempMessage.message,
+                listing_id: tempMessage.listing_id,
             });
 
             if (result.success) {
-                setMessages([...messages, result.data.message]);
-                setNewMessage('');
-                scrollToBottom();
+                const realMessage = result.data.message;
 
-                // Send via Socket.IO for real-time delivery
-                socketService.sendMessage({
-                    chatId: `chat_${user?.id}_${selectedConversation.other_user_id}`,
-                    message: newMessage,
-                    senderId: user?.id || '',
+                // Replace temp message with real message
+                setMessages((prev) => {
+                    // Check if real message already arrived via socket (prevent duplicates)
+                    if (prev.some(m => m.id === realMessage.id)) {
+                        return prev.filter(m => m.id !== tempId);
+                    }
+                    // Otherwise replace temp with real
+                    return prev.map(m => m.id === tempId ? realMessage : m);
                 });
+
+                // Socket emission is handled by backend now, but we can emit for other client logic if needed
+                // Backend emits to user rooms, so we don't strictly need to emit from client unless using client-side relay
             }
         } catch (error: any) {
             const errorMessage = handleApiError(error);
             toast.error(errorMessage);
-        } finally {
-            setIsSending(false);
+            // Remove temp message on error
+            setMessages((prev) => prev.filter(m => m.id !== tempId));
+            setNewMessage(tempMessage.message); // Restore input
         }
     };
 
@@ -359,23 +378,29 @@ function MessagesContent() {
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: true,
+                timeZone: 'Asia/Kolkata',
             });
         }
         return date.toLocaleDateString('en-IN', {
             month: 'short',
             day: 'numeric',
+            timeZone: 'Asia/Kolkata',
         });
     };
 
     const isSameDay = (d1: string, d2: string) => {
-        return new Date(d1).toDateString() === new Date(d2).toDateString();
+        // Use timezone aware comparison
+        const date1 = new Date(d1).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const date2 = new Date(d2).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+        return date1 === date2;
     };
 
     const formatDateSeparator = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('en-GB', {
             weekday: 'short',
             day: 'numeric',
-            month: 'short'
+            month: 'short',
+            timeZone: 'Asia/Kolkata',
         });
     };
 

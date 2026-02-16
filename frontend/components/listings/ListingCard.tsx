@@ -33,10 +33,11 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing }) => {
         if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
 
         // If more than 24 hours, show date like "Oct 12, 2025"
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString('en-IN', {
             month: 'short',
             day: 'numeric',
-            year: 'numeric'
+            year: 'numeric',
+            timeZone: 'Asia/Kolkata',
         });
     };
 
