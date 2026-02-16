@@ -17,8 +17,8 @@ try {
 // Create a transporter using Gmail SMTP
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // use STARTTLS
+    port: 465,
+    secure: true, // use SSL
     connectionTimeout: 10000, // 10 seconds timeout
     auth: {
         user: process.env.GMAIL_USER,
