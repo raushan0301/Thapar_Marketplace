@@ -1,5 +1,5 @@
 import resend from '../config/email';
-import transporter from '../config/nodemailer';
+import { getTransporter } from '../config/nodemailer';
 
 interface EmailOptions {
   to: string;
@@ -32,6 +32,9 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
       if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
         throw new Error('Gmail credentials missing in .env');
       }
+
+      // Get IPv4 Transporter
+      const transporter = await getTransporter();
 
       await transporter.sendMail({
         from: `ThaparMarket <${process.env.GMAIL_USER}>`,

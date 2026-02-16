@@ -14,19 +14,37 @@ try {
     console.warn('Could not set default result order to ipv4first');
 }
 
-// Create a transporter using Gmail SMTP
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // use SSL
-    connectionTimeout: 10000, // 10 seconds timeout
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    // Force IPv4 to prevent ENETUNREACH errors on specific cloud providers (like Render)
-    // that might try IPv6 and fail
-    family: 4,
-} as any);
+// Robust Transporter Factory
+// Resolves Gmail IP to IPv4 manually to bypass IPv6 issues on Render
+let transporter: nodemailer.Transporter | null = null;
 
-export default transporter;
+export const getTransporter = async () => {
+    if (transporter) return transporter;
+
+    // Resolve IPv4 for smtp.gmail.com
+    let ip = '142.250.101.108'; // Default fallback IP
+    try {
+        const addresses = await dns.promises.resolve4('smtp.gmail.com');
+        if (addresses && addresses.length > 0) {
+            ip = addresses[0];
+            console.log(`✅ Resolved Gmail SMTP to IPv4: ${ip}`);
+        }
+    } catch (e) {
+        console.warn('⚠️ DNS resolution failed, using fallback IP');
+    }
+
+    transporter = nodemailer.createTransport({
+        host: ip, // Use resolved IP
+        port: 465,
+        secure: true,
+        auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_APP_PASSWORD,
+        },
+        tls: {
+            servername: 'smtp.gmail.com', // Crucial for SSL verification matching
+        },
+    } as any);
+
+    return transporter;
+};
