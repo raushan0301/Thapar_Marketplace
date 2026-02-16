@@ -18,7 +18,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     senderName,
 }) => {
     const formatTime = (dateString: string) => {
-        const date = new Date(dateString);
+        // Ensure date is treated as UTC if no timezone offset is present
+        // This fixes the issue where server timestamps are parsed as local time causing a shift
+        const safeDateString = dateString && !dateString.includes('Z') && !dateString.includes('+')
+            ? `${dateString}Z`
+            : dateString;
+
+        const date = new Date(safeDateString);
         return date.toLocaleTimeString('en-IN', {
             hour: '2-digit',
             minute: '2-digit',

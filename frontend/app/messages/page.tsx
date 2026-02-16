@@ -369,7 +369,12 @@ function MessagesContent() {
     };
 
     const formatTime = (dateString: string) => {
-        const date = new Date(dateString);
+        // Ensure date is treated as UTC if no timezone offset is present
+        const safeDateString = dateString && !dateString.includes('Z') && !dateString.includes('+')
+            ? `${dateString}Z`
+            : dateString;
+
+        const date = new Date(safeDateString);
         const now = new Date();
         const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
@@ -389,14 +394,20 @@ function MessagesContent() {
     };
 
     const isSameDay = (d1: string, d2: string) => {
-        // Use timezone aware comparison
-        const date1 = new Date(d1).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
-        const date2 = new Date(d2).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const safeD1 = d1 && !d1.includes('Z') && !d1.includes('+') ? `${d1}Z` : d1;
+        const safeD2 = d2 && !d2.includes('Z') && !d2.includes('+') ? `${d2}Z` : d2;
+
+        const date1 = new Date(safeD1).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const date2 = new Date(safeD2).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
         return date1 === date2;
     };
 
     const formatDateSeparator = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-GB', {
+        const safeDateString = dateString && !dateString.includes('Z') && !dateString.includes('+')
+            ? `${dateString}Z`
+            : dateString;
+
+        return new Date(safeDateString).toLocaleDateString('en-GB', {
             weekday: 'short',
             day: 'numeric',
             month: 'short',
