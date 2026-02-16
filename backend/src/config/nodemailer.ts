@@ -35,15 +35,18 @@ export const getTransporter = async () => {
 
     transporter = nodemailer.createTransport({
         host: ip, // Use resolved IP
-        port: 587,
-        secure: false, // use STARTTLS
-        connectionTimeout: 10000,
+        port: 465,
+        secure: true,
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000,
         auth: {
             user: process.env.GMAIL_USER,
             pass: process.env.GMAIL_APP_PASSWORD,
         },
         tls: {
-            servername: 'smtp.gmail.com', // Crucial for SSL verification matching
+            rejectUnauthorized: false,
+            servername: 'smtp.gmail.com',
         },
     } as any);
 
