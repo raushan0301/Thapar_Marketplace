@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import compression from 'compression'; // Perf: Compress responses
 
 // Import routes
 import authRoutes from './routes/auth.routes';
@@ -62,6 +63,7 @@ const io = new Server(httpServer, {
 // Security Middleware
 app.use(helmet());
 app.use(hpp());
+app.use(compression()); // Perf: Compress all responses (Gzip)
 
 // CORS Middleware
 // Middleware
