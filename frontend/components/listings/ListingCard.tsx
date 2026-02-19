@@ -12,7 +12,7 @@ interface ListingCardProps {
         rental_rate?: number;
         images: string[];
         condition?: string;
-        listing_type: 'sell' | 'rent' | 'lost' | 'found';
+        listing_type: 'sell' | 'rent' | 'lost' | 'foundd';
         location?: string;
         views: number;
         created_at: string;
