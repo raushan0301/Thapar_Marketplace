@@ -42,9 +42,6 @@ function HomeContent() {
     }
   }, [isAuthenticated, router]);
 
-  // Never render the marketplace to logged-out users — not even for a flash
-  if (!isAuthenticated) return null;
-
   // Sync filters from URL params
   useEffect(() => {
     const search = searchParams.get('search') || '';
