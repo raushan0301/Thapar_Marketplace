@@ -67,7 +67,7 @@ function HomeContent() {
         setCategories(result.data.categories);
       }
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+
     }
   };
 

@@ -140,11 +140,8 @@ app.use('/api/ratings', ratingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/lost-found', lostFoundRoutes);
 
-// Socket.IO connection handling
 io.on('connection', (socket) => {
-    console.log(`🔌 Socket connected: ${socket.id}`);
-
-    // Join user's personal room (for receiving messages even when not in specific chat)
+    // Join user's personal room
     const userId = (socket.handshake.auth as any)?.token
         ? (() => {
             try {
@@ -158,30 +155,21 @@ io.on('connection', (socket) => {
 
     if (userId) {
         socket.join(`user_${userId}`);
-        console.log(`👤 User ${userId} joined personal room`);
     }
 
     // Join a chat room
     socket.on('join_chat', (chatId: string) => {
         socket.join(chatId);
-        console.log(`💬 Socket ${socket.id} joined chat: ${chatId}`);
     });
 
     // Send message
     socket.on('send_message', (data) => {
-        console.log(`📨 Message sent to chat: ${data.chatId}`);
-        // Emit to the specific chat room
         io.to(data.chatId).emit('new_message', data);
     });
 
     // Typing indicator
     socket.on('typing', (data) => {
         socket.to(data.chatId).emit('user_typing', data);
-    });
-
-    // Disconnect
-    socket.on('disconnect', () => {
-        console.log(`🔌 Socket disconnected: ${socket.id}`);
     });
 });
 
@@ -196,12 +184,9 @@ app.use((_req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-    console.log(`📡 Socket.IO enabled`);
-    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`🚀 ThaparMarket API running on port ${PORT}`);
 });
 
 // Handle unhandled promise rejections

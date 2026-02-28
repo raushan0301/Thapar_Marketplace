@@ -52,11 +52,7 @@ export const createLostFoundItem = async (req: AuthRequest, res: Response): Prom
         // Upload images if provided
         let imageUrls: string[] = [];
         if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-            try {
-                console.log(`📸 Uploading ${req.files.length} images...`);
-                imageUrls = await uploadMultipleImages(req.files, 'thaparmarket/lostfound');
-                console.log(`✅ Images uploaded successfully: ${imageUrls.length} images`);
-            } catch (uploadError) {
+            try {                imageUrls = await uploadMultipleImages(req.files, 'thaparmarket/lostfound');            } catch (uploadError) {
                 console.error('Image upload error:', uploadError);
                 res.status(500).json({
                     success: false,
@@ -65,9 +61,6 @@ export const createLostFoundItem = async (req: AuthRequest, res: Response): Prom
                 return;
             }
         }
-
-        console.log('💾 Inserting lost/found item into database...');
-
         // Insert listing
         const { data: listing, error } = await supabase
             .from('listings')
@@ -94,9 +87,6 @@ export const createLostFoundItem = async (req: AuthRequest, res: Response): Prom
             });
             return;
         }
-
-        console.log('✅ Lost/Found item created successfully!');
-
         res.status(201).json({
             success: true,
             message: `${listing_type === 'lost' ? 'Lost' : 'Found'} item posted successfully`,

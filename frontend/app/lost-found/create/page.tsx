@@ -44,7 +44,7 @@ function CreateLostFoundContent() {
                 setCategories(response.data.categories || []);
             }
         } catch (error) {
-            console.error('Failed to fetch categories:', error);
+
         }
     };
 
@@ -107,7 +107,7 @@ function CreateLostFoundContent() {
                 alert('Failed to create item: ' + (response.error || 'Unknown error'));
             }
         } catch (error: any) {
-            console.error('Error creating item:', error);
+
             alert('Failed to create item: ' + (error.response?.data?.error || error.message));
         } finally {
             setLoading(false);

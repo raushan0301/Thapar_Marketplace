@@ -79,7 +79,7 @@ export default function EditLostFoundPage() {
                 setCategories(catResponse.data.categories || []);
             }
         } catch (error) {
-            console.error('Failed to fetch data:', error);
+
             toast.error('Failed to load item details');
             router.push('/lost-found');
         } finally {
@@ -159,7 +159,7 @@ export default function EditLostFoundPage() {
                 toast.error('Failed to update item: ' + (response.error || 'Unknown error'));
             }
         } catch (error: any) {
-            console.error('Error updating item:', error);
+
             toast.error('Failed to update item: ' + (error.response?.data?.error || error.message));
         } finally {
             setSubmitting(false);

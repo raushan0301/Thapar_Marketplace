@@ -56,7 +56,7 @@ export default function LostFoundDetailPage() {
                 router.push('/lost-found');
             }
         } catch (error) {
-            console.error('Failed to fetch item:', error);
+
             toast.error('Failed to load item details');
             router.push('/lost-found');
         } finally {
@@ -75,7 +75,7 @@ export default function LostFoundDetailPage() {
                 router.push('/lost-found');
             }
         } catch (error) {
-            console.error('Failed to mark resolved:', error);
+
             // alert('Failed to update item status');
         } finally {
             setResolving(false);
@@ -93,7 +93,7 @@ export default function LostFoundDetailPage() {
                 setItem({ ...item, status: 'active' });
             }
         } catch (error) {
-            console.error('Failed to reactivate:', error);
+
             // alert('Failed to reactivate item');
         } finally {
             setResolving(false);
@@ -125,7 +125,7 @@ export default function LostFoundDetailPage() {
                 router.push('/lost-found');
             }
         } catch (error) {
-            console.error('Failed to delete:', error);
+
             toast.error('Failed to delete item');
         }
     };

@@ -22,7 +22,7 @@ export default function CreateListingPage() {
         price: '',
         category_id: '',
         condition: '',
-        listing_type: 'sell' as 'sell' | 'rent' | 'lost' | 'found',
+        listing_type: 'sell' as 'sell' | 'rent',
         location: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -43,7 +43,7 @@ export default function CreateListingPage() {
                 setCategories(result.data.categories);
             }
         } catch (error) {
-            console.error('Failed to fetch categories:', error);
+
         }
     };
 
@@ -62,12 +62,10 @@ export default function CreateListingPage() {
             newErrors.category_id = 'Category is required';
         }
 
-        if (formData.listing_type !== 'lost' && formData.listing_type !== 'found') {
-            if (!formData.price) {
-                newErrors.price = 'Price is required';
-            } else if (parseFloat(formData.price) <= 0) {
-                newErrors.price = 'Price must be greater than 0';
-            }
+        if (!formData.price) {
+            newErrors.price = 'Price is required';
+        } else if (parseFloat(formData.price) <= 0) {
+            newErrors.price = 'Price must be greater than 0';
         }
 
         if (images.length === 0) {
@@ -204,27 +202,23 @@ export default function CreateListingPage() {
                             >
                                 <option value="sell">For Sale</option>
                                 <option value="rent">For Rent</option>
-                                <option value="lost">Lost</option>
-                                <option value="found">Found</option>
                             </select>
                         </div>
                     </div>
 
                     {/* Price & Condition */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {formData.listing_type !== 'lost' && formData.listing_type !== 'found' && (
-                            <Input
-                                label={`Price ${formData.listing_type === 'rent' ? '(per month)' : ''}`}
-                                type="number"
-                                placeholder="0"
-                                min="0"
-                                step="0.01"
-                                value={formData.price}
-                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                error={errors.price}
-                                required
-                            />
-                        )}
+                        <Input
+                            label={`Price ${formData.listing_type === 'rent' ? '(per month)' : ''}`}
+                            type="number"
+                            placeholder="0"
+                            min="0"
+                            step="0.01"
+                            value={formData.price}
+                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                            error={errors.price}
+                            required
+                        />
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">

@@ -12,9 +12,7 @@ const pool = new Pool({
 });
 
 // Test database connection
-pool.on('connect', () => {
-    console.log('✅ Connected to Supabase PostgreSQL database');
-});
+pool.on('connect', () => {});
 
 pool.on('error', (err) => {
     console.error('❌ Unexpected database error:', err);

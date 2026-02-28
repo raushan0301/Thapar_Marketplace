@@ -79,7 +79,7 @@ function LostFoundContent() {
                 setItems(fetchedItems);
             }
         } catch (error) {
-            console.error('Failed to fetch items:', error);
+
         } finally {
             setLoading(false);
         }
@@ -103,7 +103,7 @@ function LostFoundContent() {
                 fetchItems();
             }
         } catch (error) {
-            console.error('Reactivation failed:', error);
+
             toast.error('Failed to reactivate item');
         }
     };
@@ -127,7 +127,7 @@ function LostFoundContent() {
                 setItems(prev => prev.filter(item => item.id !== itemId));
             }
         } catch (error) {
-            console.error('Delete failed:', error);
+
             toast.error('Failed to delete item');
         }
     };
@@ -146,7 +146,7 @@ function LostFoundContent() {
                 fetchItems();
             }
         } catch (error) {
-            console.error('Mark as claimed failed:', error);
+
             toast.error('Failed to mark item as claimed');
         }
     };

@@ -27,10 +27,9 @@ export const getTransporter = async () => {
         const addresses = await dns.promises.resolve4('smtp.gmail.com');
         if (addresses && addresses.length > 0) {
             ip = addresses[0];
-            console.log(`✅ Resolved Gmail SMTP to IPv4: ${ip}`);
         }
     } catch (e) {
-        console.warn('⚠️ DNS resolution failed, using fallback IP');
+        // DNS resolution failed, using fallback IP
     }
 
     transporter = nodemailer.createTransport({

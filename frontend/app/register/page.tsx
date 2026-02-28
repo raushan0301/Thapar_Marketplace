@@ -22,6 +22,7 @@ export default function RegisterPage() {
         hostel: '',
     });
     const [isLoading, setIsLoading] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const validate = () => {
@@ -57,6 +58,12 @@ export default function RegisterPage() {
             newErrors.confirmPassword = 'Please confirm your password';
         } else if (formData.password !== formData.confirmPassword) {
             newErrors.confirmPassword = 'Passwords do not match';
+        }
+
+        // Terms acceptance
+        if (!acceptedTerms) {
+            toast.error('Please accept the Terms of Service and Privacy Policy to continue.');
+            return false;
         }
 
         setErrors(newErrors);
@@ -236,7 +243,55 @@ export default function RegisterPage() {
                         </div>
                     </div>
 
-                    <Button type="submit" className="w-full mt-5" isLoading={isLoading}>
+                    {/* Terms & Conditions Checkbox */}
+                    <div className={`mt-5 rounded-xl border p-4 ${!acceptedTerms && errors.terms
+                        ? 'border-red-300 bg-red-50'
+                        : 'border-gray-200 bg-gray-50'
+                        }`}>
+                        <div className="flex items-start gap-3">
+                            {/* Real checkbox input - styled visually */}
+                            <div className="relative mt-0.5 shrink-0 w-5 h-5">
+                                <input
+                                    type="checkbox"
+                                    id="acceptTerms"
+                                    checked={acceptedTerms}
+                                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                />
+                                {/* Visual custom checkbox */}
+                                <div
+                                    className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all pointer-events-none ${acceptedTerms
+                                            ? 'bg-blue-600 border-blue-600'
+                                            : 'bg-white border-gray-400'
+                                        }`}
+                                >
+                                    {acceptedTerms && (
+                                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    )}
+                                </div>
+                            </div>
+                            <label htmlFor="acceptTerms" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
+                                I have read and agree to the{' '}
+                                <Link href="/terms" target="_blank" className="text-blue-600 font-medium hover:text-blue-700 hover:underline">Terms of Service</Link>,{' '}
+                                <Link href="/privacy" target="_blank" className="text-blue-600 font-medium hover:text-blue-700 hover:underline">Privacy Policy</Link>,{' '}
+                                and{' '}
+                                <Link href="/cookie-policy" target="_blank" className="text-blue-600 font-medium hover:text-blue-700 hover:underline">Cookie Policy</Link>{' '}
+                                of ThaparMarket.
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2.5 pl-8">
+                            By creating an account, you confirm you are a verified Thapar University student or staff member.
+                        </p>
+                    </div>
+
+                    <Button
+                        type="submit"
+                        className={`w-full mt-4 transition-all ${!acceptedTerms ? 'opacity-60 cursor-not-allowed' : ''
+                            }`}
+                        isLoading={isLoading}
+                    >
                         Create Account
                     </Button>
 

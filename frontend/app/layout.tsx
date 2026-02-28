@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         <div className="flex flex-col min-h-screen">
           <Suspense fallback={<div className="h-16 bg-white shadow-md" />}>
             <Navbar />

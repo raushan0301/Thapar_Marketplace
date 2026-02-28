@@ -84,7 +84,7 @@ export default function EditListingPage() {
                 setCategories(catResult.data.categories);
             }
         } catch (error) {
-            console.error('Failed to fetch data:', error);
+
             toast.error('Failed to load listing details');
             router.push('/my-listings');
         } finally {
@@ -154,12 +154,12 @@ export default function EditListingPage() {
                 toast.success('Listing updated successfully!');
                 router.push(`/listings/${params.id}`);
             } else {
-                console.error('Update failed:', result);
+
                 toast.error(result.error || 'Failed to update listing');
             }
         } catch (error: any) {
-            console.error('Update error:', error);
-            console.error('Error response:', error.response?.data);
+
+
             const errorMessage = handleApiError(error);
             toast.error(errorMessage);
         } finally {

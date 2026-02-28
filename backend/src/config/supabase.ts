@@ -19,7 +19,4 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
         persistSession: false
     }
 });
-
-console.log('✅ Supabase client initialized');
-
 export default supabase;

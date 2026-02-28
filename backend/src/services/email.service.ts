@@ -21,14 +21,9 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
       console.warn(`⚠️ Resend failed: ${error.message}. Attempting backup...`);
       throw new Error(error.message); // Trigger catch block for backup
     }
-
-    console.log(`✅ Email sent via Resend to ${options.to}`);
-
   } catch (resendError) {
     // Attempt 2: Try Gmail (Backup - High Availability)
     try {
-      console.log('🔄 Switching to Gmail Backup...');
-
       if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
         throw new Error('Gmail credentials missing in .env');
       }
@@ -42,9 +37,6 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
         subject: options.subject,
         html: options.html,
       });
-
-      console.log(`✅ Email sent via Gmail Backup to ${options.to}`);
-
     } catch (gmailError: any) {
       console.error('❌ Both Email Services Failed!');
       console.error('Resend Error:', resendError);

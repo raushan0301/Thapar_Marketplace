@@ -30,9 +30,7 @@ export const uploadImage = async (
                 if (error) {
                     console.error('❌ Cloudinary upload error:', error);
                     reject(error);
-                } else {
-                    console.log(`✅ Image uploaded successfully: ${result!.secure_url}`);
-                    resolve(result!.secure_url);
+                } else {                    resolve(result!.secure_url);
                 }
             }
         );
@@ -46,17 +44,11 @@ export const uploadMultipleImages = async (
     files: Express.Multer.File[],
     folder: string = 'thaparmarket'
 ): Promise<string[]> => {
-    console.log(`📤 Uploading ${files.length} images...`);
-
     try {
-        const uploadPromises = files.map((file, index) => {
-            console.log(`  - Image ${index + 1}/${files.length}: ${file.originalname}`);
-            return uploadImage(file.buffer, folder);
+        const uploadPromises = files.map((file, index) => {            return uploadImage(file.buffer, folder);
         });
 
-        const results = await Promise.all(uploadPromises);
-        console.log(`✅ All ${files.length} images uploaded successfully`);
-        return results;
+        const results = await Promise.all(uploadPromises);        return results;
     } catch (error) {
         console.error('❌ Failed to upload images:', error);
         throw error;
@@ -70,9 +62,7 @@ export const deleteImage = async (imageUrl: string): Promise<void> => {
         const publicIdWithExtension = urlParts.slice(-2).join('/');
         const publicId = publicIdWithExtension.split('.')[0];
 
-        await cloudinary.uploader.destroy(publicId);
-        console.log(`✅ Deleted image: ${publicId}`);
-    } catch (error) {
+        await cloudinary.uploader.destroy(publicId);    } catch (error) {
         console.error('❌ Error deleting image:', error);
         throw new Error('Failed to delete image');
     }

@@ -48,7 +48,6 @@ export const Navbar: React.FC = () => {
                     }
                 } catch (error) {
                     // Suppress error for background polling
-                    // console.error('Failed to fetch unread count:', error);
                 }
             };
             fetchUnreadCount();

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Mail, MapPin } from 'lucide-react';
 
 export const Footer: React.FC = () => {
@@ -13,6 +14,7 @@ export const Footer: React.FC = () => {
 
     return (
         <footer className="bg-slate-900 text-slate-300 border-t border-slate-800">
+            {/* ... middle footer logic ... */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
 
@@ -55,9 +57,9 @@ export const Footer: React.FC = () => {
                 <div className="border-t border-slate-800 mt-10 pt-6 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
                     <p>© {new Date().getFullYear()} ThaparMarket. All rights reserved.</p>
                     <div className="flex gap-6 mt-4 md:mt-0">
-                        <span className="hover:text-slate-300 cursor-pointer transition-colors">Privacy Policy</span>
-                        <span className="hover:text-slate-300 cursor-pointer transition-colors">Terms of Service</span>
-                        <span className="hover:text-slate-300 cursor-pointer transition-colors">Cookie Policy</span>
+                        <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>
+                        <Link href="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</Link>
+                        <Link href="/cookie-policy" className="hover:text-slate-300 transition-colors">Cookie Policy</Link>
                     </div>
                 </div>
             </div>

@@ -60,9 +60,6 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
         // Personal rooms are more reliable since users join them on connection
         io.to(`user_${receiver_id}`).emit('new_message', message);
         io.to(`user_${senderId}`).emit('new_message', message);
-
-        console.log(`✅ Message emitted to user_${receiver_id} and user_${senderId}`);
-
         res.status(201).json({
             success: true,
             message: 'Message sent successfully',
@@ -81,9 +78,6 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
 export const getConversations = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const userId = req.user?.userId;
-
-        console.log('📬 Fetching conversations for user:', userId);
-
         // Get all unique conversations
         const { data: messages, error } = await supabase
             .from('messages')
@@ -117,9 +111,6 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
             });
             return;
         }
-
-        console.log(`✅ Found ${messages?.length || 0} messages`);
-
         // Handle empty messages array
         if (!messages || messages.length === 0) {
             res.status(200).json({
@@ -155,9 +146,6 @@ export const getConversations = async (req: AuthRequest, res: Response): Promise
         });
 
         const conversations = Array.from(conversationsMap.values());
-
-        console.log(`✅ Returning ${conversations.length} conversations`);
-
         res.status(200).json({
             success: true,
             data: { conversations },
@@ -178,9 +166,6 @@ export const getMessages = async (req: AuthRequest, res: Response): Promise<void
         const userId = req.user?.userId;
         const { otherUserId } = req.params;
         const { page = '1', limit = '50' } = req.query;
-
-        console.log(`📨 Getting messages between ${userId} and ${otherUserId}`);
-
         const pageNum = parseInt(page as string);
         const limitNum = parseInt(limit as string);
         const offset = (pageNum - 1) * limitNum;
@@ -219,9 +204,6 @@ export const getMessages = async (req: AuthRequest, res: Response): Promise<void
             });
             return;
         }
-
-        console.log(`✅ Found ${messages?.length || 0} messages`);
-
         res.status(200).json({
             success: true,
             data: {
@@ -373,9 +355,6 @@ export const markConversationAsRead = async (req: AuthRequest, res: Response): P
     try {
         const userId = req.user?.userId;
         const { otherUserId } = req.params;
-
-        console.log(`📖 Marking all messages from ${otherUserId} to ${userId} as read`);
-
         // Update all unread messages from the other user
         const { data: messages, error } = await supabase
             .from('messages')
@@ -393,9 +372,6 @@ export const markConversationAsRead = async (req: AuthRequest, res: Response): P
             });
             return;
         }
-
-        console.log(`✅ Marked ${messages?.length || 0} messages as read`);
-
         // Emit Socket.IO event to sender to update read status in real-time
         if (messages && messages.length > 0) {
             const messageIds = messages.map((msg: any) => msg.id);

@@ -41,7 +41,6 @@ function MessagesContent() {
                 setProfileDetails(result.data.user);
             }
         } catch (error) {
-            console.error('Failed to fetch user details:', error);
         } finally {
             setLoadingProfile(false);
         }
@@ -201,7 +200,6 @@ function MessagesContent() {
             }
         } catch (error: any) {
             const errorMessage = handleApiError(error);
-            console.error('❌ Failed to fetch conversations:', errorMessage, error);
             setError(errorMessage);
         } finally {
             setIsLoading(false);
@@ -213,7 +211,6 @@ function MessagesContent() {
 
 
         if (!conversation.other_user_id) {
-            console.error('❌ No other_user_id in conversation:', conversation);
             setError('Invalid conversation - missing user ID');
             return;
         }
@@ -247,7 +244,7 @@ function MessagesContent() {
                         // Emit event to update navbar unread count
                         eventBus.emit('unreadCountUpdated');
                     } catch (err) {
-                        console.error('Failed to mark conversation as read:', err);
+                        // silently ignore - non-critical
                     }
                 }
 
@@ -298,7 +295,6 @@ function MessagesContent() {
                 }) : null);
             }
         } catch (error) {
-            console.error('Failed to fetch user details:', error);
             setSelectedConversation((prev: any) => prev ? ({
                 ...prev,
                 other_user_name: 'User',
