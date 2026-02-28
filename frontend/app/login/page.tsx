@@ -22,9 +22,12 @@ export default function LoginPage() {
 
     useEffect(() => {
         if (isAuthenticated) {
-            router.push('/');
+            router.replace('/');
         }
     }, [isAuthenticated, router]);
+
+    // Prevent login form from flashing for authenticated users
+    if (isAuthenticated) return null;
 
     const validate = () => {
         const newErrors: { email?: string; password?: string } = {};

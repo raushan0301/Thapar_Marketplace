@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authService } from '@/services/authService';
+import { useAuthStore } from '@/store/authStore';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import toast from 'react-hot-toast';
@@ -24,6 +25,16 @@ export default function RegisterPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [acceptedTerms, setAcceptedTerms] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const { isAuthenticated } = useAuthStore();
+
+    // Redirect already-logged-in users — prevent accessing register while authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            router.replace('/');
+        }
+    }, [isAuthenticated, router]);
+
+    if (isAuthenticated) return null;
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
@@ -261,8 +272,8 @@ export default function RegisterPage() {
                                 {/* Visual custom checkbox */}
                                 <div
                                     className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all pointer-events-none ${acceptedTerms
-                                            ? 'bg-blue-600 border-blue-600'
-                                            : 'bg-white border-gray-400'
+                                        ? 'bg-blue-600 border-blue-600'
+                                        : 'bg-white border-gray-400'
                                         }`}
                                 >
                                     {acceptedTerms && (
